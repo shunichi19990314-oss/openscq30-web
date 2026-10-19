@@ -1,0 +1,18 @@
+{
+  "name": "OpenSCQ30 Web",
+  "short_name": "OpenSCQ30",
+  "description": "Soundcore P30i (A3959) settings in the browser, over Web Serial / Bluetooth RFCOMM",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#12151c",
+  "theme_color": "#12151c",
+  "lang": "ja",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
