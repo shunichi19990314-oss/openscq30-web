@@ -8,6 +8,13 @@ import {
   portLabel,
 } from "../transport/webSerial";
 import { vendorUuidCandidates } from "../session/session";
+import {
+  AlertIcon,
+  BluetoothIcon,
+  ChevronIcon,
+  HeadphonesArt,
+  PlugIcon,
+} from "./icons";
 
 export interface ConnectScreenProps {
   connecting: boolean;
@@ -32,7 +39,6 @@ export function ConnectScreen({
   const supported = isWebSerialSupported();
   const secure = isSecureContext();
   const [ports, setPorts] = useState<SerialPort[]>([]);
-  const [showAdvanced, setShowAdvanced] = useState(false);
   const [uuidDraft, setUuidDraft] = useState(customUuids.join("\n"));
 
   useEffect(() => {
@@ -50,90 +56,130 @@ export function ConnectScreen({
     };
   }, [supported, connecting]);
 
+  const checks = [
+    { label: t("browser-check-secure"), ok: secure },
+    { label: t("browser-check-serial"), ok: supported },
+    { label: t("browser-check-paired"), ok: null },
+  ];
+
   return (
     <div className="screen connect-screen">
       <section className="card">
-        <h1>{t("app-title")}</h1>
-        <p className="subtitle">{t("app-subtitle")}</p>
-
-        {!secure ? <div className="banner warning">{t("insecure-context")}</div> : null}
-        {!supported ? <div className="banner warning">{t("browser-unsupported")}</div> : null}
-        {error ? <div className="banner error">{error}</div> : null}
-
-        <div className="button-stack">
-          <button
-            type="button"
-            className="primary"
-            disabled={connecting || !supported || !secure}
-            onClick={onConnectSerial}
-          >
-            {connecting ? t("connecting") : t("connect-real-device")}
-          </button>
-          <button type="button" className="secondary" disabled={connecting} onClick={onConnectDemo}>
-            {t("connect-demo-device")}
-          </button>
-        </div>
-
-        <details className="instructions">
-          <summary>{t("pair-first")}</summary>
-          <ol>
-            <li>OS の Bluetooth 設定で P30i をペアリングしておく</li>
-            <li>
-              このページで「{t("connect-real-device")}」を押す
-            </li>
-            <li>
-              一覧から Soundcore の項目（Bluetooth RFCOMM）を選ぶ。表示されない場合は下の「
-              {t("advanced")}」でサービス UUID を追加する
-            </li>
-            <li>デスクトップ版 OpenSCQ30 や公式アプリとは同時に接続しない</li>
-          </ol>
-          <p className="hint">
-            対応ブラウザ: Chrome / Edge 117 以降（Windows・macOS・Linux・ChromeOS）、Chrome 138
-            以降（Android）。Safari / Firefox / iOS では Web Serial が使えないため実機接続はできません
-            （デモモードは動作します）。
-          </p>
-        </details>
-
-        {supported && ports.length > 0 ? (
-          <div className="granted-ports">
-            <h2>{t("reconnect-granted")}</h2>
-            <ul>
-              {ports.map((port, index) => (
-                <li key={index}>
-                  <button
-                    type="button"
-                    className="ghost"
-                    disabled={connecting}
-                    onClick={() => onConnectPort(port)}
-                  >
-                    {portLabel(port)}
-                  </button>
+        <div className="hero">
+          <HeadphonesArt className="hero-art" />
+          <div>
+            <h1>{t("app-title")}</h1>
+            <p className="subtitle">{t("app-subtitle")}</p>
+            <ul className="checklist">
+              {checks.map((check) => (
+                <li key={check.label}>
+                  <span
+                    className={`dot${check.ok === null ? "" : check.ok ? " dot-ok" : " dot-no"}`}
+                  />
+                  <span>{check.label}</span>
+                  {check.ok === null ? <span className="hint">（OS 側で実施）</span> : null}
                 </li>
               ))}
             </ul>
           </div>
+        </div>
+
+        {!secure ? (
+          <div className="banner banner-warning" role="alert">
+            <AlertIcon width={16} height={16} />
+            <span>{t("insecure-context")}</span>
+          </div>
+        ) : null}
+        {!supported ? (
+          <div className="banner banner-warning" role="alert">
+            <AlertIcon width={16} height={16} />
+            <span>{t("browser-unsupported")}</span>
+          </div>
+        ) : null}
+        {error ? (
+          <div className="banner banner-error" role="alert">
+            <AlertIcon width={16} height={16} />
+            <span>{error}</span>
+          </div>
         ) : null}
 
-        <div className="advanced-toggle">
-          <button type="button" className="ghost" onClick={() => setShowAdvanced((value) => !value)}>
-            {showAdvanced ? "▾" : "▸"} {t("advanced")}
+        <div className="cta-stack">
+          <button
+            type="button"
+            className="btn btn-primary btn-lg btn-block"
+            disabled={connecting || !supported || !secure}
+            onClick={onConnectSerial}
+          >
+            {connecting ? <span className="spinner" /> : <BluetoothIcon width={17} height={17} />}
+            {connecting ? t("connecting") : t("connect-real-device")}
           </button>
+          <button
+            type="button"
+            className="btn btn-secondary btn-block"
+            disabled={connecting}
+            onClick={onConnectDemo}
+          >
+            <PlugIcon width={16} height={16} />
+            {t("connect-demo-device")}
+          </button>
+          <p className="hint">{t("demo-note")}</p>
         </div>
-        {showAdvanced ? (
-          <div className="advanced">
-            <label className="stacked">
+
+        {supported && ports.length > 0 ? (
+          <div className="disclosure-body">
+            <h2 className="visually-hidden">{t("granted-ports-title")}</h2>
+            <div className="chip-row">
+              {ports.map((port, index) => (
+                <button
+                  key={index}
+                  type="button"
+                  className="chip"
+                  disabled={connecting}
+                  onClick={() => onConnectPort(port)}
+                >
+                  {portLabel(port)}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        <details className="disclosure">
+          <summary>
+            <ChevronIcon className="chevron" width={15} height={15} />
+            {t("connect-how-to")}
+          </summary>
+          <div className="disclosure-body">
+            <ol className="steps">
+              <li>{t("pair-first")}</li>
+              <li>「{t("connect-real-device")}」を押す</li>
+              <li>{t("chooser-pick-soundcore")}</li>
+              <li>{t("do-not-share-connection")}</li>
+            </ol>
+            <p className="hint">{t("supported-browsers")}</p>
+          </div>
+        </details>
+
+        <details className="disclosure">
+          <summary>
+            <ChevronIcon className="chevron" width={15} height={15} />
+            {t("advanced")}
+          </summary>
+          <div className="disclosure-body">
+            <label className="field">
               <span>{t("custom-service-uuids")}</span>
-              <small>{t("custom-service-uuids-hint")}</small>
               <textarea
                 rows={3}
                 value={uuidDraft}
                 placeholder={vendorUuidCandidates("3959").join("\n")}
                 onChange={(event) => setUuidDraft(event.target.value)}
               />
+              <small className="hint">{t("custom-service-uuids-hint")}</small>
             </label>
             <div className="row-actions">
               <button
                 type="button"
+                className="btn btn-secondary"
                 onClick={() =>
                   onSaveCustomUuids(
                     uuidDraft
@@ -147,17 +193,17 @@ export function ConnectScreen({
               </button>
             </div>
             <p className="hint">
-              既定で許可される UUID: {vendorUuidCandidates("3959").join(", ")} および標準 SPP
-              （00001101-0000-1000-8000-00805f9b34fb）。
+              {t("default-uuids")}: {vendorUuidCandidates("3959").join(", ")} / SPP
+              （00001101-0000-1000-8000-00805f9b34fb）
             </p>
           </div>
-        ) : null}
+        </details>
       </section>
 
-      <section className="card about">
+      <section className="card">
         <h2>{t("about")}</h2>
-        <p>{t("about-body")}</p>
-        <p>
+        <p className="hint">{t("about-body")}</p>
+        <p className="hint">
           <a href="https://github.com/Oppzippy/OpenSCQ30" target="_blank" rel="noreferrer">
             {t("upstream-link")}
           </a>

@@ -38,6 +38,29 @@ Safari / Firefox / iOS では Web Serial が実装されていないため**実�
 - **通信ログ**: 送受信パケットを 16 進で表示（実機トラブルシュート用）
 - **日本語 / English** UI
 
+## 見た目
+
+| 接続画面 | 設定画面（ダーク） |
+| --- | --- |
+| ![connect](docs/screenshots/connect-dark.png) | ![device](docs/screenshots/device-dark.png) |
+
+| ライトテーマ | モバイル | 通信ログ |
+| --- | --- | --- |
+| ![light](docs/screenshots/device-light.png) | ![mobile](docs/screenshots/device-mobile.png) | ![log](docs/screenshots/device-log.png) |
+
+UI の要点:
+
+- **折り返しのない一画面の情報設計**: カテゴリはアコーディオンにし、閉じた状態でも
+  「いま何になっているか」をサブタイトルに表示（例: `ノイキャン` / `8/8 割り当て中` / `1 台接続中`）
+- **モード類はセグメントコントロール**（アイコン付き）、**イコライザーはドラッグ可能な応答カーブ**
+  （アクセシビリティ用にスライダーも併設、`prefers-reduced-motion` 対応）
+- **タッチ操作は 左×右 のマトリクス**、**デバイス情報はコンパクトなキー/バリュー表**で行数を削減
+- **バッテリーはリング表示**、接続中はトップバーに不定プログレス、エラーは自動消滅するトースト
+- **通信ログはボトムドロワー**（送信/受信/警告/エラーでフィルタ、16 進を表示）
+- ダーク / ライト自動、依存 CSS ライブラリ・Web フォント不使用（バンドルは JS 81 KB gzip）
+
+スクリーンショットの再生成: `npm run screenshots`（ヘッドレス Chromium が必要）
+
 ## まず試す（実機不要）
 
 ```bash

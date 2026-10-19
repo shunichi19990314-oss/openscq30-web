@@ -1,24 +1,29 @@
 import { useState } from "react";
 
 import type { SettingDescriptor, SettingValue } from "../lib/settings";
-import type { QuickPreset, QuickPresetStore } from "../session/storage";
+import type { QuickPresetStore } from "../session/storage";
 import { PRESETTABLE_SETTING_IDS, settingToValue } from "../session/session";
 import { useApp } from "./context";
+import { useQuickPresets } from "./useQuickPresets";
+import { PlusIcon } from "./icons";
 
+/**
+ * Quick presets: capture the current settings once and re-apply them later. Stored in the browser
+ * (openscq30-lib keeps these in sqlite).
+ */
 export function QuickPresets({
   store,
-  presets,
   descriptors,
   disabled,
   onApply,
 }: {
   store: QuickPresetStore;
-  presets: QuickPreset[];
   descriptors: SettingDescriptor[];
   disabled: boolean;
   onApply: (values: Array<[string, SettingValue]>) => Promise<void>;
 }) {
   const { t } = useApp();
+  const presets = useQuickPresets(store);
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
   const [applying, setApplying] = useState<string | null>(null);
@@ -29,6 +34,7 @@ export function QuickPresets({
       if (!PRESETTABLE_SETTING_IDS.includes(descriptor.id)) continue;
       const value = settingToValue(descriptor);
       if (!value) continue;
+      // A null select means "custom" or "disabled"; capturing it would undo the user's intent.
       if (value.type === "string" && value.value === null) continue;
       captured.push({ id: descriptor.id, value });
     }
@@ -36,18 +42,19 @@ export function QuickPresets({
   };
 
   return (
-    <section className="card quick-presets">
+    <section className="card">
       <div className="card-header">
         <h2>{t("quick-presets")}</h2>
         <button
           type="button"
-          className="ghost"
+          className="btn btn-ghost"
           disabled={disabled}
           onClick={() => {
             setCreating((value) => !value);
             setName("");
           }}
         >
+          <PlusIcon width={15} height={15} />
           {t("create-quick-preset")}
         </button>
       </div>
@@ -55,6 +62,7 @@ export function QuickPresets({
       {creating ? (
         <div className="inline-form">
           <input
+            className="input"
             autoFocus
             value={name}
             placeholder={t("quick-preset-name")}
@@ -69,6 +77,7 @@ export function QuickPresets({
           />
           <button
             type="button"
+            className="btn"
             disabled={!name.trim() || disabled}
             onClick={() => {
               store.save(name.trim(), capture());
@@ -77,20 +86,23 @@ export function QuickPresets({
           >
             {t("save")}
           </button>
-          <button type="button" className="ghost" onClick={() => setCreating(false)}>
+          <button type="button" className="btn btn-ghost" onClick={() => setCreating(false)}>
             {t("cancel")}
           </button>
         </div>
       ) : null}
 
-      {presets.length === 0 ? <p className="hint">{t("quick-presets-empty")}</p> : (
+      {presets.length === 0 ? (
+        <p className="hint">{t("quick-presets-empty")}</p>
+      ) : (
         <ul className="preset-list">
-          {presets.map((preset) => (
-            <li key={preset.id}>
+          {presets.map((preset, index) => (
+            <li key={preset.id} style={{ ["--i" as string]: index }}>
               <span className="preset-name">{preset.name}</span>
-              <span className="preset-count">{preset.values.length}</span>
+              <span className="preset-count">{t("preset-setting-count", { count: preset.values.length })}</span>
               <button
                 type="button"
+                className="btn btn-secondary"
                 disabled={disabled || applying !== null}
                 onClick={async () => {
                   setApplying(preset.id);
@@ -103,16 +115,26 @@ export function QuickPresets({
                   }
                 }}
               >
-                {applying === preset.id ? t("applying-setting") : t("apply-quick-preset")}
+                {applying === preset.id ? (
+                  <>
+                    <span className="spinner" />
+                    {t("applying-setting")}
+                  </>
+                ) : (
+                  t("apply-quick-preset")
+                )}
               </button>
               <button
                 type="button"
-                className="ghost danger-text"
+                className="btn btn-icon"
                 disabled={disabled}
+                aria-label={t("delete-quick-preset")}
                 title={t("delete-quick-preset")}
                 onClick={() => store.remove(preset.id)}
               >
-                ✕
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden focusable="false">
+                  <path d="M6 6 18 18M18 6 6 18" />
+                </svg>
               </button>
             </li>
           ))}

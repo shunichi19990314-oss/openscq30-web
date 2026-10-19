@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import { LANGUAGES, createTranslator, detectLanguage, type Language } from "./i18n";
+import { HeadphonesIcon } from "./ui/icons";
 import { AppContext } from "./ui/context";
 import { ConnectScreen } from "./ui/ConnectScreen";
 import { DeviceScreen } from "./ui/DeviceScreen";
@@ -93,8 +94,12 @@ export function App() {
   return (
     <AppContext.Provider value={contextValue}>
       <div className="app">
+        {snapshot.busy ? <div className="top-progress" role="progressbar" aria-label={t("applying-setting")} /> : null}
         <div className="top-bar">
-          <span className="top-bar-title">OpenSCQ30 Web</span>
+          <span className="brand">
+            <HeadphonesIcon className="brand-mark" width={22} height={22} />
+            OpenSCQ30 Web
+          </span>
           <label className="language-picker">
             <span className="visually-hidden">{t("language")}</span>
             <select

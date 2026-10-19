@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "smoke": "npm run build && node scripts/smoke.mjs"
+    "smoke": "npm run build && node scripts/smoke.mjs",
+    "screenshots": "npm run build && node scripts/screenshots.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",
@@ -23,6 +24,7 @@
     "@types/w3c-web-serial": "^1.0.6",
     "@vitejs/plugin-react": "^4.3.4",
     "jsdom": "^29.1.1",
+    "playwright": "^1.49.0",
     "typescript": "^5.6.3",
     "vite": "^5.4.11",
     "vitest": "^2.1.8"

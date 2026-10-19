@@ -1,12 +1,23 @@
 /**
  * Generic setting controls. They render whatever the device controller reports, so adding another
  * device model later only means adding a controller.
+ *
+ * A few well known settings get a richer control (segmented mode picker, draggable equalizer); the
+ * rest fall back to the compact row renderers below.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 import type { SettingDescriptor, SettingValue } from "../lib/settings";
 import type { Translator } from "../i18n";
+import { Switch } from "./primitives";
+import { Segmented, type SegmentedOption } from "./primitives";
+import { EqualizerControl } from "./Equalizer";
+import {
+  NoiseCancelingIcon,
+  NormalModeIcon,
+  TransparencyIcon,
+} from "./icons";
 
 export interface ControlProps {
   descriptor: SettingDescriptor;
@@ -36,7 +47,9 @@ export function SettingRow({
   );
 }
 
-export function InformationControl({ descriptor, label }: ControlProps) {
+/* --------------------------------------------------------------- renderers --- */
+
+function Information({ descriptor, label }: ControlProps) {
   if (descriptor.setting.kind !== "information") return null;
   return (
     <SettingRow label={label}>
@@ -45,26 +58,50 @@ export function InformationControl({ descriptor, label }: ControlProps) {
   );
 }
 
-export function ToggleControl({ descriptor, label, disabled, onChange }: ControlProps) {
+function Toggle({ descriptor, label, disabled, onChange }: ControlProps) {
   if (descriptor.setting.kind !== "toggle") return null;
-  const { value } = descriptor.setting;
   return (
     <SettingRow label={label}>
-      <button
-        type="button"
-        role="switch"
-        aria-checked={value}
-        className={`switch${value ? " switch-on" : ""}`}
+      <Switch
+        checked={descriptor.setting.value}
         disabled={disabled}
-        onClick={() => onChange({ type: "bool", value: !value })}
-      >
-        <span className="switch-knob" />
-      </button>
+        label={label}
+        onChange={(value) => onChange({ type: "bool", value })}
+      />
     </SettingRow>
   );
 }
 
-export function SelectControl({ descriptor, label, disabled, t, onChange }: ControlProps) {
+/** Segmented picker used for the mode style settings. */
+function SegmentedRow({
+  descriptor,
+  label,
+  disabled,
+  icons,
+  onChange,
+}: ControlProps & { icons?: Record<string, React.ReactNode> }) {
+  const setting = descriptor.setting;
+  if (setting.kind !== "select" && setting.kind !== "optionalSelect") return null;
+  const options: SegmentedOption[] = setting.select.options.map((option) => ({
+    value: option.value,
+    label: option.label,
+    ...(icons?.[option.value] ? { icon: icons[option.value] } : {}),
+  }));
+  return (
+    <SettingRow label={label}>
+      <Segmented
+        options={options}
+        value={setting.select.value}
+        disabled={disabled}
+        compact={!icons}
+        ariaLabel={label}
+        onChange={(value) => onChange({ type: "string", value })}
+      />
+    </SettingRow>
+  );
+}
+
+function Select({ descriptor, label, disabled, t, onChange }: ControlProps) {
   const setting = descriptor.setting;
   if (setting.kind !== "select" && setting.kind !== "optionalSelect") return null;
   const optional = setting.kind === "optionalSelect";
@@ -75,18 +112,19 @@ export function SelectControl({ descriptor, label, disabled, t, onChange }: Cont
   return (
     <SettingRow label={label}>
       <select
-        value={setting.select.value ?? ""}
+        aria-label={label}
+        value={currentValue ?? ""}
         disabled={disabled}
         onChange={(event) =>
           onChange({ type: "string", value: event.target.value === "" ? null : event.target.value })
         }
       >
         {/* For an optional select, "none" is a real choice (a disabled button). Otherwise the
-            placeholder only represents a value that is not in the list, so it is not selectable. */}
+            placeholder only stands in for a value that is not in the list. */}
         {optional ? <option value="">—</option> : null}
         {!optional && !hasListedOption ? (
           <option value="" disabled>
-            {setting.select.value ? t(setting.select.value) : t("custom")}
+            {currentValue ? t(currentValue) : t("custom")}
           </option>
         ) : null}
         {setting.select.options.map((option) => (
@@ -99,22 +137,25 @@ export function SelectControl({ descriptor, label, disabled, t, onChange }: Cont
   );
 }
 
-export function RangeControl({ descriptor, label, disabled, onChange }: ControlProps) {
+function Range({ descriptor, label, disabled, onChange }: ControlProps) {
   if (descriptor.setting.kind !== "range") return null;
   const { min, max, step, value } = descriptor.setting;
   // Devices can report values outside the documented range (the adaptive sensitivity level has
-  // been seen as 255). Clamp the slider but keep showing the real value.
+  // been seen as 255): clamp the slider but keep showing the real number.
   const clamped = Math.min(max, Math.max(min, value));
+  const fill = ((clamped - min) / (max - min)) * 100;
   return (
-    <SettingRow label={label} hint={clamped === value ? undefined : `${min}–${max}`} >
+    <SettingRow label={label} hint={clamped === value ? undefined : `${min}–${max}`}>
       <div className="range-control">
         <input
           type="range"
+          aria-label={label}
           min={min}
           max={max}
           step={step}
           value={clamped}
           disabled={disabled}
+          style={{ ["--fill" as string]: `${fill}%` }}
           onChange={(event) => onChange({ type: "number", value: Number(event.target.value) })}
         />
         <output>{value}</output>
@@ -123,30 +164,35 @@ export function RangeControl({ descriptor, label, disabled, onChange }: ControlP
   );
 }
 
-export function ActionControl({ descriptor, label, disabled, t, onChange }: ControlProps) {
+function Action({ descriptor, label, disabled, t, onChange }: ControlProps) {
   if (descriptor.setting.kind !== "action") return null;
   const [confirming, setConfirming] = useState(false);
+  useEffect(() => {
+    if (!confirming) return;
+    const timer = setTimeout(() => setConfirming(false), 6000);
+    return () => clearTimeout(timer);
+  }, [confirming]);
   return (
     <SettingRow label={label}>
       {confirming ? (
-        <span className="confirm-group">
+        <span className="row-actions">
           <button
             type="button"
-            className="danger"
+            className="btn btn-danger"
             disabled={disabled}
             onClick={() => {
               setConfirming(false);
               onChange({ type: "action" });
             }}
           >
-            {t("reset-buttons-to-default")}
+            {t("confirm")}
           </button>
-          <button type="button" className="ghost" onClick={() => setConfirming(false)}>
+          <button type="button" className="btn btn-ghost" onClick={() => setConfirming(false)}>
             {t("cancel")}
           </button>
         </span>
       ) : (
-        <button type="button" className="danger" disabled={disabled} onClick={() => setConfirming(true)}>
+        <button type="button" className="btn btn-ghost" disabled={disabled} onClick={() => setConfirming(true)}>
           {t("reset-buttons-to-default")}
         </button>
       )}
@@ -154,13 +200,7 @@ export function ActionControl({ descriptor, label, disabled, t, onChange }: Cont
   );
 }
 
-export function ModifiableSelectControl({
-  descriptor,
-  label,
-  disabled,
-  t,
-  onChange,
-}: ControlProps) {
+function ModifiableSelect({ descriptor, label, disabled, t, onChange }: ControlProps) {
   const setting = descriptor.setting;
   if (setting.kind !== "modifiableSelect") return null;
   const [adding, setAdding] = useState(false);
@@ -169,6 +209,7 @@ export function ModifiableSelectControl({
     <SettingRow label={label}>
       <div className="modifiable-select">
         <select
+          aria-label={label}
           value={setting.select.value ?? ""}
           disabled={disabled}
           onChange={(event) =>
@@ -182,30 +223,33 @@ export function ModifiableSelectControl({
             </option>
           ))}
         </select>
-        <button
-          type="button"
-          className="ghost"
-          disabled={disabled}
-          onClick={() => {
-            setAdding(true);
-            setName("");
-          }}
-        >
-          {t("add-profile")}
-        </button>
-        {setting.select.value ? (
+        <div className="row-actions">
           <button
             type="button"
-            className="ghost danger-text"
+            className="btn btn-ghost"
             disabled={disabled}
-            onClick={() => onChange({ type: "remove", name: setting.select.value! })}
+            onClick={() => {
+              setAdding((value) => !value);
+              setName("");
+            }}
           >
-            {t("delete")}
+            {t("add-profile")}
           </button>
-        ) : null}
+          {setting.select.value ? (
+            <button
+              type="button"
+              className="btn btn-ghost btn-danger-text"
+              disabled={disabled}
+              onClick={() => onChange({ type: "remove", name: setting.select.value as string })}
+            >
+              {t("delete")}
+            </button>
+          ) : null}
+        </div>
         {adding ? (
           <div className="inline-form">
             <input
+              className="input"
               autoFocus
               value={name}
               placeholder={t("profile-name")}
@@ -220,6 +264,7 @@ export function ModifiableSelectControl({
             />
             <button
               type="button"
+              className="btn"
               disabled={!name.trim() || disabled}
               onClick={() => {
                 onChange({ type: "add", name: name.trim() });
@@ -228,7 +273,7 @@ export function ModifiableSelectControl({
             >
               {t("save")}
             </button>
-            <button type="button" className="ghost" onClick={() => setAdding(false)}>
+            <button type="button" className="btn btn-ghost" onClick={() => setAdding(false)}>
               {t("cancel")}
             </button>
           </div>
@@ -238,7 +283,7 @@ export function ModifiableSelectControl({
   );
 }
 
-export function MultiSelectControl({ descriptor, label, disabled, t, onChange }: ControlProps) {
+function MultiSelect({ descriptor, label, disabled, t, onChange }: ControlProps) {
   const setting = descriptor.setting;
   if (setting.kind !== "multiSelect" && setting.kind !== "multiSelectWithRemove") return null;
   const removable = setting.kind === "multiSelectWithRemove";
@@ -250,80 +295,49 @@ export function MultiSelectControl({ descriptor, label, disabled, t, onChange }:
     onChange({ type: "strings", value: [...next] });
   };
   return (
-    <SettingRow label={label}>
+    <SettingRow label={label} hint={removable ? t("dual-connections-limit") : undefined}>
       <div className="multi-select">
-        {removable ? <small className="hint">{t("dual-connections-limit")}</small> : null}
-        {setting.select.options.length === 0 ? <em>—</em> : null}
-        {setting.select.options.map((option) => (
-          <label key={option.value} className="checkbox">
-            <input
-              type="checkbox"
-              checked={selected.has(option.value)}
-              disabled={disabled}
-              onChange={() => toggle(option.value)}
-            />
-            <span>{option.label}</span>
-            <code>{option.value}</code>
-            {removable ? (
-              <button
-                type="button"
-                className="ghost danger-text"
+        {setting.select.options.length === 0 ? <p className="hint">{t("none")}</p> : null}
+        {setting.select.options.map((option) => {
+          const checked = selected.has(option.value);
+          return (
+            <label
+              key={option.value}
+              className={`checkbox-card${checked ? " checkbox-card-checked" : ""}`}
+            >
+              <input
+                type="checkbox"
+                checked={checked}
                 disabled={disabled}
-                onClick={(event) => {
-                  event.preventDefault();
-                  onChange({ type: "remove", name: option.value });
-                }}
-              >
-                ✕
-              </button>
-            ) : null}
-          </label>
-        ))}
+                onChange={() => toggle(option.value)}
+              />
+              <span className="name">{option.label}</span>
+              <code>{option.value}</code>
+              {removable ? (
+                <button
+                  type="button"
+                  className="btn btn-icon"
+                  aria-label={t("delete")}
+                  disabled={disabled}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    onChange({ type: "remove", name: option.value });
+                  }}
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden focusable="false">
+                    <path d="M6 6 18 18M18 6 6 18" />
+                  </svg>
+                </button>
+              ) : null}
+            </label>
+          );
+        })}
       </div>
     </SettingRow>
   );
 }
 
-export function ImportStringControl({ descriptor, label, disabled, t, onChange }: ControlProps) {
-  if (descriptor.setting.kind !== "importString") return null;
-  const [text, setText] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  return (
-    <SettingRow label={label} hint={descriptor.setting.confirmationMessage}>
-      <div className="import-string">
-        <textarea
-          rows={3}
-          value={text}
-          placeholder='[{"name":"My EQ","volumeAdjustments":[0,0,0,0,0,0,0,0]}]'
-          onChange={(event) => setText(event.target.value)}
-        />
-        <div className="row-actions">
-          <button
-            type="button"
-            disabled={disabled || text.trim().length === 0}
-            onClick={() => {
-              // Validate before handing the value over: `onChange` is applied asynchronously, so a
-              // failure there would not reach this catch block and the input would be lost.
-              const problem = validateProfileJson(text);
-              if (problem) {
-                setError(problem);
-                return;
-              }
-              onChange({ type: "string", value: text });
-              setError(null);
-              setText("");
-            }}
-          >
-            {t("import-profiles")}
-          </button>
-          {error ? <span className="error-text">{error}</span> : null}
-        </div>
-      </div>
-    </SettingRow>
-  );
-}
-
-/** Local, synchronous version of the import validation, so the UI can show the error inline. */
+/** Local, synchronous validation so a failure does not silently discard the pasted JSON. */
 function validateProfileJson(text: string): string | null {
   let parsed: unknown;
   try {
@@ -345,7 +359,46 @@ function validateProfileJson(text: string): string | null {
   return null;
 }
 
-export function ExportOutputControl({ descriptor, label, t }: ControlProps) {
+function ImportString({ descriptor, label, disabled, t, onChange }: ControlProps) {
+  if (descriptor.setting.kind !== "importString") return null;
+  const [text, setText] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <SettingRow label={label} hint={descriptor.setting.confirmationMessage}>
+      <div className="import-string">
+        <textarea
+          rows={3}
+          aria-label={label}
+          value={text}
+          placeholder='[{"name":"My EQ","volumeAdjustments":[0,0,0,0,0,0,0,0]}]'
+          onChange={(event) => setText(event.target.value)}
+        />
+        <div className="row-actions">
+          <button
+            type="button"
+            className="btn"
+            disabled={disabled || text.trim().length === 0}
+            onClick={() => {
+              const problem = validateProfileJson(text);
+              if (problem) {
+                setError(problem);
+                return;
+              }
+              onChange({ type: "string", value: text });
+              setError(null);
+              setText("");
+            }}
+          >
+            {t("import-profiles")}
+          </button>
+          {error ? <span className="error-text">{error}</span> : null}
+        </div>
+      </div>
+    </SettingRow>
+  );
+}
+
+function ExportOutput({ descriptor, label, t }: ControlProps) {
   if (descriptor.setting.kind !== "information") return null;
   const [copied, setCopied] = useState(false);
   const value = descriptor.setting.value;
@@ -360,14 +413,14 @@ export function ExportOutputControl({ descriptor, label, t }: ControlProps) {
         <textarea rows={3} readOnly value={value} onFocus={(event) => event.target.select()} />
         <button
           type="button"
-          className="ghost"
+          className="btn btn-ghost"
           disabled={!value}
           onClick={async () => {
             try {
               await navigator.clipboard.writeText(value);
               setCopied(true);
             } catch {
-              // clipboard may be unavailable; the textarea is selectable anyway
+              // The clipboard may be unavailable; the textarea is selectable anyway.
             }
           }}
         >
@@ -378,202 +431,90 @@ export function ExportOutputControl({ descriptor, label, t }: ControlProps) {
   );
 }
 
-/** Renders the control that matches a setting descriptor. */
+/* --------------------------------------------------------------- dispatch --- */
+
+const AMBIENT_MODE_ICONS: Record<string, React.ReactNode> = {
+  noiseCanceling: <NoiseCancelingIcon />,
+  transparency: <TransparencyIcon />,
+  normal: <NormalModeIcon />,
+};
+
+/** Compact labels so the segmented control never wraps to two lines. */
+const AMBIENT_MODE_SHORT_KEYS: Record<string, string> = {
+  noiseCanceling: "ambient-short-noiseCanceling",
+  transparency: "ambient-short-transparency",
+  normal: "ambient-short-normal",
+};
+
 export function SettingControl(props: ControlProps): React.ReactElement | null {
-  const kind = props.descriptor.setting.kind;
+  const { descriptor } = props;
+  const kind = descriptor.setting.kind;
+
+  switch (descriptor.id) {
+    case "ambientSoundMode": {
+      const setting = descriptor.setting;
+      const shortened =
+        setting.kind === "select" || setting.kind === "optionalSelect"
+          ? {
+              ...descriptor,
+              setting: {
+                ...setting,
+                select: {
+                  ...setting.select,
+                  options: setting.select.options.map((option) => ({
+                    ...option,
+                    label:
+                      AMBIENT_MODE_SHORT_KEYS[option.value] ?
+                        props.t(AMBIENT_MODE_SHORT_KEYS[option.value]) :
+                        option.label,
+                  })),
+                },
+              },
+            }
+          : descriptor;
+      return <SegmentedRow {...props} descriptor={shortened} icons={AMBIENT_MODE_ICONS} />;
+    }
+    case "noiseCancelingMode":
+    case "multiSceneNoiseCanceling":
+      return <SegmentedRow {...props} />;
+    default:
+      break;
+  }
+
   switch (kind) {
     case "information":
-      return props.descriptor.id === "exportCustomEqualizerProfilesOutput" ? (
-        <ExportOutputControl {...props} />
+      return descriptor.id === "exportCustomEqualizerProfilesOutput" ? (
+        <ExportOutput {...props} />
       ) : (
-        <InformationControl {...props} />
+        <Information {...props} />
       );
     case "toggle":
-      return <ToggleControl {...props} />;
+      return <Toggle {...props} />;
     case "select":
     case "optionalSelect":
-      return <SelectControl {...props} />;
+      return <Select {...props} />;
     case "modifiableSelect":
-      return <ModifiableSelectControl {...props} />;
+      return <ModifiableSelect {...props} />;
     case "range":
-      return <RangeControl {...props} />;
+      return <Range {...props} />;
     case "multiSelect":
     case "multiSelectWithRemove":
-      return <MultiSelectControl {...props} />;
+      return <MultiSelect {...props} />;
     case "importString":
-      return <ImportStringControl {...props} />;
+      return <ImportString {...props} />;
     case "action":
-      return <ActionControl {...props} />;
+      return <Action {...props} />;
     case "equalizer":
-      return <EqualizerControl {...props} />;
+      return (
+        <EqualizerControl
+          setting={descriptor.setting}
+          label={props.label}
+          disabled={props.disabled}
+          t={props.t}
+          onChange={(values) => props.onChange({ type: "numbers", value: values })}
+        />
+      );
     default:
       return null;
   }
-}
-
-/* -------------------------------------------------------------- equalizer --- */
-
-/** How long the equalizer keeps showing unconfirmed values before falling back to the device. */
-const PENDING_CONFIRM_TIMEOUT_MS = 4000;
-
-interface EqualizerSetting {
-  kind: "equalizer";
-  bandHz: number[];
-  min: number;
-  max: number;
-  fractionDigits: number;
-  value: number[];
-  readOnly: boolean;
-}
-
-function arraysEqual(a: number[], b: number[]): boolean {
-  return a.length === b.length && a.every((value, index) => value === b[index]);
-}
-
-function formatDb(raw: number, fractionDigits: number): string {
-  const db = raw / Math.pow(10, fractionDigits);
-  return `${db > 0 ? "+" : ""}${db.toFixed(fractionDigits)}`;
-}
-
-function formatHz(hz: number): string {
-  return hz >= 1000 ? `${(hz / 1000).toFixed(hz % 1000 === 0 ? 0 : 1)}kHz` : `${hz}Hz`;
-}
-
-export function EqualizerControl({ descriptor, label, disabled, t, onChange }: ControlProps) {
-  const setting = descriptor.setting as EqualizerSetting;
-  // `pending` is what was sent to the device but not confirmed yet. Keeping it avoids the sliders
-  // snapping back to the old values for the round trip duration.
-  const [draft, setDraft] = useState<number[] | null>(null);
-  const [pending, setPending] = useState<number[] | null>(null);
-  const values = useMemo(() => draft ?? pending ?? setting.value, [draft, pending, setting.value]);
-
-  useEffect(() => {
-    if (!pending) return;
-    if (arraysEqual(pending, setting.value)) {
-      setPending(null);
-      return;
-    }
-    // The write may have failed or the device may not echo the value back; do not keep showing an
-    // unconfirmed value forever.
-    const timer = setTimeout(() => setPending(null), PENDING_CONFIRM_TIMEOUT_MS);
-    return () => clearTimeout(timer);
-  }, [pending, setting.value]);
-
-  const scale = Math.pow(10, setting.fractionDigits);
-  const commit = (next: number[]): void => {
-    setDraft(null);
-    setPending(next);
-    onChange({ type: "numbers", value: next });
-  };
-
-  if (setting.readOnly) {
-    return (
-      <SettingRow label={label}>
-        <span className="information-value">{values.map((value) => formatDb(value, setting.fractionDigits)).join(" / ")}</span>
-      </SettingRow>
-    );
-  }
-
-  return (
-    <div className="equalizer-setting">
-      <div className="setting-label">
-        <span>{label}</span>
-        <small>
-          {setting.min / scale} dB 〜 {setting.max / scale} dB
-        </small>
-      </div>
-      <EqualizerCurve
-        bandHz={setting.bandHz}
-        values={values}
-        min={setting.min}
-        max={setting.max}
-        fractionDigits={setting.fractionDigits}
-      />
-      <div className="equalizer-bands">
-        {setting.bandHz.map((hz, index) => (
-          <div className="band" key={hz}>
-            <input
-              type="range"
-              aria-label={`${formatHz(hz)}`}
-              min={setting.min}
-              max={setting.max}
-              step={1}
-              value={values[index] ?? 0}
-              disabled={disabled}
-              onChange={(event) => {
-                const next = values.slice();
-                next[index] = Number(event.target.value);
-                setDraft(next);
-              }}
-              onPointerUp={() => commit(values)}
-              onKeyUp={() => commit(values)}
-              onBlur={() => {
-                if (draft) commit(values);
-              }}
-            />
-            <output>{formatDb(values[index] ?? 0, setting.fractionDigits)}</output>
-            <span className="band-hz">{formatHz(hz)}</span>
-          </div>
-        ))}
-      </div>
-      {draft ? (
-        <div className="row-actions">
-          <button type="button" disabled={disabled} onClick={() => commit(draft)}>
-            {t("apply-quick-preset")}
-          </button>
-          <button type="button" className="ghost" onClick={() => setDraft(null)}>
-            {t("cancel")}
-          </button>
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-function EqualizerCurve({
-  bandHz,
-  values,
-  min,
-  max,
-  fractionDigits,
-}: {
-  bandHz: number[];
-  values: number[];
-  min: number;
-  max: number;
-  fractionDigits: number;
-}) {
-  const width = 320;
-  const height = 96;
-  const padding = 8;
-  const xFor = (index: number): number =>
-    padding + (index * (width - padding * 2)) / Math.max(1, bandHz.length - 1);
-  const yFor = (value: number): number => {
-    const ratio = (value - min) / (max - min);
-    return height - padding - ratio * (height - padding * 2);
-  };
-  const points = bandHz.map((_, index) => `${xFor(index)},${yFor(values[index] ?? 0)}`);
-  const zeroY = yFor(0);
-  return (
-    <svg
-      className="equalizer-curve"
-      viewBox={`0 0 ${width} ${height}`}
-      role="img"
-      aria-label={`equalizer curve, ${values
-        .map((value, index) => `${formatHz(bandHz[index])} ${formatDb(value, fractionDigits)}dB`)
-        .join(", ")}`}
-    >
-      <line x1={padding} y1={zeroY} x2={width - padding} y2={zeroY} className="curve-zero" />
-      <polyline points={points.join(" ")} className="curve-line" />
-      {bandHz.map((hz, index) => (
-        <circle
-          key={hz}
-          cx={xFor(index)}
-          cy={yFor(values[index] ?? 0)}
-          r={3}
-          className="curve-point"
-        />
-      ))}
-    </svg>
-  );
 }
