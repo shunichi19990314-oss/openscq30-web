@@ -65,30 +65,37 @@ npm run dev        # http://localhost:5173
   Linux なら `bluetoothctl` + `sdptool browse <MAC>`、またはデスクトップ版 OpenSCQ30 を
   `--verbose` で起動してログから確認できます
 
-## Render にデプロイする
+## デプロイする
 
-リポジトリには `render.yaml`（Blueprint）が入っています。
+**デプロイしなくても実機で試せます**: `http://localhost` は secure context 扱いなので、
+`npm run dev` → Chrome / Edge で `http://localhost:5173` を開けば、そのまま P30i に接続できます。
 
-### A. Blueprint で作成（おすすめ）
+公開する場合、本アプリは静的ファイルだけなので HTTPS で配信できる場所ならどこでも動きます。
 
-1. GitHub にこのリポジトリを push する
-2. Render ダッシュボード → **New +** → **Blueprint** → リポジトリを選択
-3. `render.yaml` が読み込まれ、静的サイト `openscq30-web` が作成される
-4. デプロイ完了後、`https://<your-app>.onrender.com` を Chrome / Edge で開く
+### Render（Blueprint を使わない方法も含む）
 
-### B. 手動作成
+一番簡単なのは Dashboard からの手動作成です。
 
-1. Render → **New +** → **Static Site**
-2. リポジトリを指定し、以下を設定
-   - **Build Command**: `npm ci && npm run build`
-   - **Publish Directory**: `./dist`
-   - 環境変数 `NODE_VERSION` = `20.17.0`
-3. **Create Static Site**
+1. https://dashboard.render.com/ → **New +** → **Static Site** → リポジトリを選択
+2. **Build Command**: `npm ci && npm run build` / **Publish Directory**: `dist`
+3. 環境変数 `NODE_VERSION` = `20.17.0`
+4. **Create Static Site** → `https://<name>.onrender.com`
 
-詳細とトラブルシュートは [docs/deploy-render.md](docs/deploy-render.md)。
+Blueprint（`render.yaml` 同梱）、Deploy Hook による CI 連携、Render API / CLI での作成手順と
+トラブルシュート表は **[docs/deploy-render.md](docs/deploy-render.md)** にまとめてあります。
+
+### Render 以外
+
+GitHub Pages（ワークフロー同梱）・Cloudflare Pages・Netlify・Vercel・自前 nginx・Docker の手順と、
+サブパス配信時の `BASE_PATH` 指定は **[docs/deploy-other-platforms.md](docs/deploy-other-platforms.md)**。
+
+```bash
+npm ci && npm run build                 # -> dist/
+BASE_PATH=/openscq30-web/ npm run build  # GitHub Pages のようなサブパス配信用
+```
 
 > **注意**: Web Serial はトップレベルの HTTPS ページでのみ使えます。iframe に埋め込む場合は
-> `allow="serial"` が必要です（`render.yaml` の `Permissions-Policy` は self のみ許可しています）。
+> 埋め込み側で `allow="serial"` が必要です（`render.yaml` の `Permissions-Policy` は self のみ許可）。
 
 ## 開発
 

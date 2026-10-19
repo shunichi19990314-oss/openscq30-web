@@ -1,0 +1,51 @@
+# Optional: deploy to GitHub Pages instead of (or alongside) Render.
+#
+# Enable it in the repository settings: Settings -> Pages -> Build and deployment
+# -> Source: "GitHub Actions". Web Serial works there because Pages is served over HTTPS.
+#
+# It only runs when triggered manually, because it fails while GitHub Pages is not enabled for
+# this repository. Once you have set Settings -> Pages -> Source to "GitHub Actions", you can add
+# the `push: branches: [main]` trigger below to deploy on every push.
+name: pages
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Build for the repository sub path
+        run: npm run build
+        env:
+          # Project pages are served from /<repository name>/
+          BASE_PATH: /${{ github.event.repository.name }}/
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

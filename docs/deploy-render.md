@@ -1,87 +1,224 @@
-# Render へのデプロイ手順
+# Render へのデプロイ（Blueprint 以外を含む全方法）
 
-OpenSCQ30 Web は**完全にクライアントサイド**で動くアプリです。Bluetooth 通信はブラウザ内の
-Web Serial API が直接行うため、Render 側には**静的ファイルを配信するだけ**の役割しかありません。
-つまり無料枠の Static Site で十分で、サーバーの常駐コストも発生しません。
+OpenSCQ30 Web は**完全にクライアントサイド**のアプリです。Bluetooth 通信はブラウザ内の Web Serial
+API が直接行うため、ホスティング側は**静的ファイルを HTTPS で配信するだけ**で動きます。
+サーバープロセスもデータベースも不要です。
 
-## 前提
+> **共通の必須条件**: Web Serial は **secure context**（HTTPS または `http://localhost`）でのみ
+> 使えます。Render の `*.onrender.com` は HTTPS なので追加設定は不要です。
 
-- GitHub（または GitLab / Bitbucket）に push されたリポジトリ
-- Render アカウント（無料プランで可）
-- Node 20 系（Render 側で `NODE_VERSION` により指定）
+| 方法 | 必要なもの | 自動デプロイ | 用途 |
+| --- | --- | --- | --- |
+| [A. Dashboard で Static Site を手動作成](#a-dashboard-で-static-site-を手動作成) | Render アカウント | push で自動 | **一番簡単（おすすめ）** |
+| [B. Deploy Hook](#b-deploy-hook-でデプロイをトリガーする) | 既存サービス | CI 経由で任意のタイミング | ビルドを CI の後に回したいとき |
+| [C. Render API](#c-render-api-でサービスを作成する) | API Key | push で自動 | スクリプト／IaC から作りたいとき |
+| [D. Render CLI](#d-render-cli-で作成する) | CLI トークン | push で自動 | ターミナルから作りたいとき |
+| [E. Blueprint](#e-blueprint-renderyaml) | GitHub 連携 | push で自動 | `render.yaml` を使う（参考） |
 
-## 方法 A: Blueprint（`render.yaml`）を使う
+---
 
-リポジトリ直下の `render.yaml` に、ビルドコマンド・公開ディレクトリ・セキュリティヘッダー・
-SPA 用の rewrite がすべて定義済みです。
+## A. Dashboard で Static Site を手動作成
 
-1. Render ダッシュボード → **New +** → **Blueprint**
-2. 対象リポジトリ（とブランチ）を選択
-3. 内容を確認して **Apply**
+`render.yaml` を一切使わない方法です。
 
-`openscq30-web` という Static Site が作成され、push のたびに自動デプロイされます。
-Pull Request プレビューも有効（`pullRequestPreviewEnabled: true`）なので、PR ごとに
-`https://<service>-<pr番号>.onrender.com` のような URL で確認できます。
+1. https://dashboard.render.com/ → **New +** → **Static Site**
+2. **Connect a Git provider** で GitHub を連携し、`shunichi19990314-oss/openscq30-web` を選択
+3. 設定を入力
 
-### `render.yaml` の要点
+   | 項目 | 値 |
+   | --- | --- |
+   | Name | `openscq30-web`（任意） |
+   | Region | 近いもの（例: Singapore / Tokyo） |
+   | Branch | `main` |
+   | Root Directory | （空 = リポジトリ直下） |
+   | Runtime | **Node** |
+   | Build Command | `npm ci && npm run build` |
+   | Publish Directory | `dist` |
+   | Plan | **Free** |
 
-| 項目 | 値 | 説明 |
-| --- | --- | --- |
-| `runtime` | `static` | 静的サイト。サーバープロセスは起動しない |
-| `buildCommand` | `npm ci && npm run build` | 型チェック（`tsc --noEmit`）→ Vite ビルド |
-| `staticPublishPath` | `./dist` | Vite の出力先 |
-| `headers` | CSP ほか | `script-src 'self'` などの最小構成 |
-| `routes` | `/* → /index.html` | SPA rewrite |
-| `envVars.NODE_VERSION` | `20.17.0` | ビルド時の Node バージョン固定 |
+4. **Advanced** → **Environment Variables** に追加
 
-## 方法 B: 手動で Static Site を作る
+   | Key | Value |
+   | --- | --- |
+   | `NODE_VERSION` | `20.17.0` |
 
-1. Render → **New +** → **Static Site**
-2. リポジトリを選択
-3. 設定
-   - **Name**: 任意（例 `openscq30-web`）
-   - **Branch**: `main`
-   - **Build Command**: `npm ci && npm run build`
-   - **Publish Directory**: `dist`
-   - **Environment Variables**: `NODE_VERSION` = `20.17.0`
-4. **Create Static Site**
+   （未指定だと古い Node が使われてビルドが失敗することがあります）
 
-## デプロイ後の確認
+5. **Create Static Site**
 
-1. `https://<your-app>.onrender.com` を **Chrome または Edge** で開く
+数分で `https://<name>.onrender.com` が発行されます。以降 `main` への push で自動デプロイされます。
+
+### ヘッダーや SPA rewrite を後から足す
+
+手動作成した場合、`render.yaml` のヘッダー（CSP など）は適用されません。必要なら
+**Settings → Headers & Routes**（または **Rewrites and Redirects**）から追加できます。
+
+- Header: `Content-Security-Policy` = `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'self'`
+- Header: `Permissions-Policy` = `serial=(self), bluetooth=(self)`
+- Rewrite: `/*` → `/index.html`（本アプリは単一ルートなので任意）
+
+本アプリは外部スクリプト・外部フォント・通信先を一切使わないので、CSP はあってもなくても動作します。
+
+---
+
+## B. Deploy Hook でデプロイをトリガーする
+
+サービスを作成したあと、**任意のタイミングでビルドを走らせる**方法です。
+「GitHub Actions のテストが通ったらデプロイする」構成にできます。
+
+1. Render Dashboard → 対象サービス → **Settings** → **Deploy Hook** の URL をコピー
+   （`https://api.render.com/deploy/srv-XXXX?key=YYYY` の形式。**この URL は秘密情報**です）
+2. GitHub リポジトリ → **Settings** → **Secrets and variables** → **Actions** →
+   **New repository secret** に `RENDER_DEPLOY_HOOK_URL` として登録
+3. ワークフローから叩く
+
+```yaml
+# .github/workflows/deploy.yaml
+name: deploy
+on:
+  push:
+    branches: [main]
+
+jobs:
+  test-then-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: npm }
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npm test
+      - name: Trigger Render deploy
+        env:
+          deploy_url: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: curl -fsS "$deploy_url"
+```
+
+手元から手動でトリガーする場合:
+
+```bash
+curl "https://api.render.com/deploy/srv-XXXX?key=YYYY"
+# → 200 {"deploy":{"id":"dep-..."}}  = デプロイ開始
+# → 202 = 別のデプロイが実行中（完了後に順次実行）
+```
+
+特定のコミットだけデプロイしたい場合は `&ref=<commit-sha>` を付けます。
+
+> Render 側で **Settings → Auto-Deploy** を `No` にしておくと、push では勝手にデプロイされず、
+> Deploy Hook（または手動 Deploy）だけで制御できます。
+
+---
+
+## C. Render API でサービスを作成する
+
+Dashboard を使わずにスクリプトで作成する方法です。
+
+1. https://dashboard.render.com/account/api-keys で **API Key** を発行
+2. Workspace ID を確認（Dashboard の **Workspace Settings** の URL に含まれる `ws-XXXX`）
+3. サービスを作成
+
+```bash
+export RENDER_API_KEY=rnd-XXXXXXXX
+export OWNER_ID=ws-XXXXXXXX
+
+curl -sS -X POST "https://api.render.com/v1/services" \
+  -H "Authorization: Bearer $RENDER_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "static_site",
+    "name": "openscq30-web",
+    "ownerId": "'"$OWNER_ID"'",
+    "repo": "https://github.com/shunichi19990314-oss/openscq30-web",
+    "branch": "main",
+    "autoDeployTrigger": "commit",
+    "envVars": [{ "key": "NODE_VERSION", "value": "20.17.0" }],
+    "staticSiteDetails": {
+      "buildCommand": "npm ci && npm run build",
+      "publishPath": "dist",
+      "pullRequestPreviewsEnabled": "yes"
+    }
+  }'
+```
+
+レスポンスの `service.serviceDetails.url` が公開 URL、`service.dashboardUrl` が管理画面です。
+作成と同時に初回ビルドが走ります。以降の操作は
+`POST /v1/services/{id}/deploys`（デプロイ）、`GET /v1/services/{id}/deploys`（状態確認）など。
+
+GitHub 連携がまだの場合は、先に Dashboard で GitHub アプリをインストールして
+リポジトリへのアクセスを許可しておく必要があります。
+
+---
+
+## D. Render CLI で作成する
+
+Render 公式 CLI（Go 製のバイナリ、npm パッケージではありません）。
+
+```bash
+# インストール（いずれか）
+brew install render                                   # macOS
+winget install render.cli                             # Windows
+curl -fsSL https://raw.githubusercontent.com/render-oss/cli/refs/heads/main/bin/install.sh | sh
+
+render login                 # ブラウザで Authorize CLI
+render workspace set         # 対象ワークスペースを選択
+
+# サービス作成（非対話モードのみ）
+render services create \
+  --repo https://github.com/shunichi19990314-oss/openscq30-web \
+  --name openscq30-web
+
+# デプロイのトリガーと完了待ち
+render deploys create srv-XXXX --wait
+
+# render.yaml の構文チェック（Blueprint を使う前に確認できる）
+render blueprints validate ./render.yaml
+
+# ログ確認
+render logs srv-XXXX
+```
+
+CLI は `render.yaml` の**検証**にも使えるので、Blueprint を適用する前の確認に使えます。
+
+---
+
+## E. Blueprint（`render.yaml`）
+
+参考までに、リポジトリには Blueprint 用の `render.yaml` が入っています
+（ビルドコマンド・公開ディレクトリ・ヘッダー・SPA rewrite・`NODE_VERSION` を定義済み）。
+
+- Dashboard → **New +** → **Blueprint** → リポジトリ選択 → **Apply**
+
+Blueprint の利点は「ヘッダーや rewrite まで含めた構成がコードで管理される」ことです。
+手動作成（A）との違いはそこだけで、ビルド結果は同一です。
+
+---
+
+## デプロイ後の動作確認
+
+1. 発行された URL を **Chrome または Edge**（Android なら Chrome）で開く
 2. トップページに「イヤホンに接続する」「デモ機器で試す」が出る
-3. 「デモ機器で試す」で設定画面が出ることを確認（実機不要の動作確認）
-4. 実機は OS でペアリングしてから「イヤホンに接続する」→ 一覧から Soundcore を選択
+3. 「デモ機器で試す」で設定画面が出ることを確認（実機不要）
+4. 実機: OS でペアリング → 「イヤホンに接続する」→ 一覧から Soundcore を選択
 
-`https` で配信されている限り Web Serial の secure context 要件は満たされます。
-Render の `onrender.com` ドメインは HTTPS + 有効な証明書なので追加設定は不要です。
+`chrome://inspect/#devices` ではなく、ページ上で **F12 → Console** を開くと
+Web Serial のエラー理由が確認できます（`navigator.serial` が `undefined` なら
+ブラウザ未対応か非セキュアコンテキスト）。
 
-## 独自ドメインを使う場合
-
-Render の Static Site に独自ドメインを追加しても HTTPS は自動発行されます。
-Web Serial は origin 単位で権限を記憶するため、**ドメインを変えると機器の許可はやり直し**になります。
-
-## トラブルシュート
+## うまくいかないとき
 
 | 症状 | 原因と対処 |
 | --- | --- |
+| ビルドが `npm ci` で失敗 | `package-lock.json` が commit されているか（必須）。`NODE_VERSION` を 20 系に |
+| 404 になる | Publish Directory が `dist`（`./dist` でも可）になっているか |
+| 開くと真っ白 | `BASE_PATH` を付けてビルドしていないか（Render はドメイン直下なので不要） |
 | 「このブラウザからは接続できません」 | Safari / Firefox / iOS。Chrome・Edge・Android Chrome を使う |
-| 「Web Serial はセキュアコンテキストでのみ…」 | `http://` で開いている。HTTPS（または `localhost`）で開く |
-| 選択ダイアログに何も出ない | OS 側で未ペアリング、または他アプリが RFCOMM を占有。公式アプリ／デスクトップ版を閉じる |
-| 選択しても接続に失敗する | サービス UUID が違う可能性。「詳細設定」で UUID を追加して再試行 |
-| 接続できるが設定が読み込めない | ファームウェア差異で state update パケットの長さが違う可能性。通信ログの 16 進を本家 issue に添えて報告すると解析が進みます |
-| ビルドが失敗する | `NODE_VERSION` が古いか、`package-lock.json` を commit し忘れている（`npm ci` は lock 必須） |
+| 「Web Serial はセキュアコンテキストでのみ…」 | `http://` で開いている。HTTPS か `localhost` で開く |
+| 選択ダイアログに何も出ない | OS 未ペアリング、または公式アプリ／デスクトップ版が RFCOMM を占有 |
+| 接続できるが状態を読み込めない | ファームウェア差異。「通信ログ」の 16 進（特に `01 01` の応答）を控えて issue へ |
 
-## iframe 埋め込みについて
+## Render を使わない場合
 
-Web Serial は Permissions Policy の対象です。他サイトから iframe で埋め込む場合は
-埋め込み側に `allow="serial"` が必要です。本リポジトリの `render.yaml` は
-`Permissions-Policy: serial=(self), bluetooth=(self)` を送出しているため、
-**同一 origin 以外からの埋め込みでは実機接続ができません**（デモモードは動作します）。
-埋め込みを許可したい場合はこのヘッダーを外してください。
-
-## CI
-
-`.github/workflows/ci.yaml` が push / PR で型チェック・テスト・ビルドを実行し、
-`dist/` をアーティファクトとして保存します。Render のデプロイとは独立しているので、
-GitHub Actions 側からデプロイをトリガーする構成（`render.yaml` を使わない方法）に変えることもできます。
+GitHub Pages / Cloudflare Pages / Netlify / Vercel / 自前 nginx、
+および**デプロイせずに localhost で実機を触る方法**は
+[docs/deploy-other-platforms.md](deploy-other-platforms.md) を参照してください。
