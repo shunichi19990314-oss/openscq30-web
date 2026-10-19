@@ -113,6 +113,8 @@ export class Session {
   private connection: TransportConnection | null = null;
   private demoDevice: DemoA3959Device | null = null;
   private logCounter = 0;
+  /** Number of in-flight setting changes, so overlapping requests cannot clear `busy` early. */
+  private busyCount = 0;
   private unsubscribeController: (() => void) | null = null;
   private unsubscribeSettings: (() => void) | null = null;
 
@@ -163,7 +165,12 @@ export class Session {
   /** Connects to an already granted port (no chooser). */
   async connectToPort(port: SerialPort): Promise<void> {
     const connection = await openPort(port);
-    await this.start(connection, "serial", connection.name);
+    try {
+      await this.start(connection, "serial", connection.name);
+    } catch (error) {
+      await connection.close().catch(() => undefined);
+      throw error;
+    }
   }
 
   /** Connects to the simulated device. */
@@ -187,9 +194,22 @@ export class Session {
     this.log("info", `${this.options.t("connecting")} (${label})`);
 
     connection.setDisconnectHandler((reason) => {
-      this.log("warn", `disconnected: ${reason instanceof Error ? reason.message : String(reason ?? "")}`);
-      void this.teardown();
-      this.update({ status: "idle", connectionKind: null, connectionLabel: null, state: null, settings: [] });
+      this.log(
+        "warn",
+        `disconnected: ${reason instanceof Error ? reason.message : String(reason ?? "")}`,
+      );
+      // Await teardown before flipping the status, so a reconnect cannot race with it.
+      void this.teardown().then(() => {
+        this.busyCount = 0;
+        this.update({
+          status: "idle",
+          connectionKind: null,
+          connectionLabel: null,
+          state: null,
+          settings: [],
+          busy: false,
+        });
+      });
     });
 
     const packetIo = new PacketIo(connection, "suffix", {
@@ -228,6 +248,7 @@ export class Session {
       await packetIo.close();
       this.packetIo = null;
       this.connection = null;
+      this.demoDevice = null;
       this.update({
         status: "error",
         error: this.options.t("error-connect", { message }),
@@ -272,9 +293,19 @@ export class Session {
     return this.controller;
   }
 
+  private beginBusy(): void {
+    this.busyCount += 1;
+    this.update({ busy: true });
+  }
+
+  private endBusy(): void {
+    this.busyCount = Math.max(0, this.busyCount - 1);
+    if (this.busyCount === 0) this.update({ busy: false });
+  }
+
   async applySetting(id: A3959SettingId, value: SettingValue): Promise<void> {
     const controller = this.requireController();
-    this.update({ busy: true });
+    this.beginBusy();
     this.log("debug", `set ${id}`, formatSettingValue(value));
     try {
       await controller.setValue(id, value);
@@ -285,13 +316,13 @@ export class Session {
       this.update({ error: this.options.t("error-setting", { message }) });
       throw error;
     } finally {
-      this.update({ busy: false });
+      this.endBusy();
     }
   }
 
   async applyBatch(values: Array<[A3959SettingId, SettingValue]>): Promise<void> {
     const controller = this.requireController();
-    this.update({ busy: true });
+    this.beginBusy();
     this.log("debug", `set ${values.length} setting(s)`);
     try {
       await controller.setValues(values);
@@ -302,18 +333,23 @@ export class Session {
       this.update({ error: this.options.t("error-setting", { message }) });
       throw error;
     } finally {
-      this.update({ busy: false });
+      this.endBusy();
     }
   }
 
   async refresh(): Promise<void> {
     const controller = this.requireController();
-    this.update({ busy: true });
+    this.beginBusy();
     try {
       await controller.refresh();
       this.update({ state: controller.getState(), settings: controller.getSettings() });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.log("error", message);
+      this.update({ error: this.options.t("error-setting", { message }) });
+      throw error;
     } finally {
-      this.update({ busy: false });
+      this.endBusy();
     }
   }
 

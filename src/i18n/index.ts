@@ -59,6 +59,7 @@ const en: Dictionary = {
   "reset-buttons-to-default": "Reset Buttons to Default",
   "dual-connections": "Dual Connections",
   "dual-connections-devices": "Connected Devices",
+  "dual-connections-limit": "Up to two devices can be connected at the same time.",
   "surround-sound": "Surround Sound",
   "auto-power-off": "Auto Power Off",
   "touch-tone": "Touch Tone",
@@ -142,6 +143,8 @@ const en: Dictionary = {
   "refresh-state": "Refresh",
   "quick-presets": "Quick Presets",
   "create-quick-preset": "Create Quick Preset",
+  "quick-presets-empty":
+    "Save the current settings as a preset to apply them all at once later.",
   "delete-quick-preset": "Delete Quick Preset",
   "apply-quick-preset": "Apply",
   "quick-preset-name": "Name",
@@ -235,6 +238,7 @@ const ja: Dictionary = {
   "reset-buttons-to-default": "ボタン設定を初期値に戻す",
   "dual-connections": "デュアル接続（マルチポイント）",
   "dual-connections-devices": "接続するデバイス",
+  "dual-connections-limit": "同時に接続できるのは 2 台までです。",
   "surround-sound": "サラウンドサウンド",
   "auto-power-off": "オートパワーオフ",
   "touch-tone": "操作音",
@@ -318,6 +322,8 @@ const ja: Dictionary = {
   "refresh-state": "再読み込み",
   "quick-presets": "設定プリセット",
   "create-quick-preset": "設定プリセットを作る",
+  "quick-presets-empty":
+    "いまの設定をまとめて保存しておくと、あとから一括で適用できます。",
   "delete-quick-preset": "設定プリセットを削除",
   "apply-quick-preset": "適用",
   "quick-preset-name": "名前",
@@ -371,9 +377,14 @@ const dictionaries: Record<Language, Dictionary> = { en, ja };
 
 export function detectLanguage(): Language {
   if (typeof navigator === "undefined") return "en";
-  const stored = localStorage.getItem("openscq30-web:language");
-  if (stored === "ja" || stored === "en") return stored;
-  return navigator.language.toLowerCase().startsWith("ja") ? "ja" : "en";
+  // localStorage can throw (private mode, blocked storage); fall back to the browser language.
+  try {
+    const stored = localStorage.getItem("openscq30-web:language");
+    if (stored === "ja" || stored === "en") return stored;
+  } catch {
+    // ignore and use the browser language
+  }
+  return (navigator.language ?? "en").toLowerCase().startsWith("ja") ? "ja" : "en";
 }
 
 export function createTranslator(language: Language): (key: string, params?: Record<string, string | number>) => string {

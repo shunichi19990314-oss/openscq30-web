@@ -11,6 +11,7 @@
  */
 
 import {
+  MAX_PACKET_LENGTH,
   type ChecksumKind,
   type Command,
   type Packet,
@@ -32,6 +33,7 @@ export class DeviceError extends Error {
 
 interface PendingRequest {
   resolve: (packet: Packet) => void;
+  reject: (error: unknown) => void;
 }
 
 export interface PacketIoOptions {
@@ -79,19 +81,26 @@ export class PacketIo {
 
     let offset = 0;
     while (offset < this.buffer.length) {
-      const result = takePacket(
-        "inbound",
-        this.buffer.subarray(offset),
-        this.checksumKind,
-      );
+      const result = takePacket("inbound", this.buffer.subarray(offset), this.checksumKind);
       if (result.kind === "incomplete") {
+        // Keep the tail and wait for more bytes, unless the outstanding data is already larger than
+        // any real packet could be (a corrupt length field would otherwise stall us forever).
+        if (this.buffer.length - offset > MAX_PACKET_LENGTH) {
+          this.log("warn", "dropping byte while resynchronizing: oversized pending packet");
+          offset += 1;
+          continue;
+        }
         break;
       }
       if (result.kind === "error") {
-        // Matches openscq30-lib: drop everything and resynchronize on the next chunk.
-        this.log("warn", `failed to parse packet, clearing buffer: ${String(result.error)}`);
-        this.buffer = new Uint8Array(0);
-        return;
+        // Resynchronize by skipping one byte and looking for the next packet start.
+        //
+        // openscq30-lib clears the whole buffer here, which also throws away a valid packet that
+        // arrived in the same chunk (for example when a single stray byte precedes it). Skipping
+        // one byte at a time recovers without losing anything.
+        this.log("warn", `failed to parse packet, resynchronizing: ${String(result.error)}`);
+        offset += 1;
+        continue;
       }
       offset += result.length;
       this.dispatch(result.packet);
@@ -120,29 +129,35 @@ export class PacketIo {
   }
 
   private waitForResponse(command: Command, timeoutMs: number): Promise<Packet> {
+    const key = commandKey(command);
     return new Promise<Packet>((resolve, reject) => {
-      const key = commandKey(command);
-      const entry: PendingRequest = { resolve };
-      const queue = this.pending.get(key) ?? [];
-      queue.push(entry);
-      this.pending.set(key, queue);
-
+      const entry: PendingRequest = {
+        resolve: (packet: Packet) => {
+          clearTimeout(timer);
+          resolve(packet);
+        },
+        reject: (error: unknown) => {
+          clearTimeout(timer);
+          reject(error);
+        },
+      };
       const timer = setTimeout(() => {
-        const current = this.pending.get(key);
-        if (!current) return;
-        const index = current.indexOf(entry);
-        if (index >= 0) current.splice(index, 1);
-        if (current.length === 0) this.pending.delete(key);
+        this.removeWaiter(key, entry);
         reject(new DeviceError(`timed out after ${timeoutMs}ms`, "timeout"));
       }, timeoutMs);
 
-      // Clean up the timer once resolved.
-      const originalResolve = entry.resolve;
-      entry.resolve = (packet: Packet) => {
-        clearTimeout(timer);
-        originalResolve(packet);
-      };
+      const queue = this.pending.get(key) ?? [];
+      queue.push(entry);
+      this.pending.set(key, queue);
     });
+  }
+
+  private removeWaiter(key: string, entry: PendingRequest): void {
+    const queue = this.pending.get(key);
+    if (!queue) return;
+    const index = queue.indexOf(entry);
+    if (index >= 0) queue.splice(index, 1);
+    if (queue.length === 0) this.pending.delete(key);
   }
 
   private async writeBytes(bytes: Uint8Array): Promise<void> {
@@ -173,6 +188,7 @@ export class PacketIo {
 
       let lastError: unknown;
       for (let attempt = 1; attempt <= retries; attempt++) {
+        if (this.closed) throw new DeviceError("connection closed", "disconnected");
         const timeoutMs = baseTimeoutMs * attempt;
         const response = this.waitForResponse(packet.command, timeoutMs);
         try {
@@ -186,6 +202,8 @@ export class PacketIo {
         try {
           return await response;
         } catch (error) {
+          // A rejection caused by close() must not trigger another write attempt.
+          if (this.closed) throw error;
           lastError = error;
           this.log("debug", `no response for attempt ${attempt}`, packet.command);
         }
@@ -218,7 +236,8 @@ export class PacketIo {
         let received: Packet;
         try {
           received = await response;
-        } catch {
+        } catch (error) {
+          if (this.closed) throw error;
           // Timed out waiting for another packet: that is how the transfer ends.
           return;
         }
@@ -244,10 +263,15 @@ export class PacketIo {
 
   async close(): Promise<void> {
     this.closed = true;
-    for (const [, queue] of this.pending) {
-      queue.length = 0;
-    }
+    // Reject in-flight requests; otherwise their promises would never settle and the write queue
+    // would stay blocked behind them.
+    const queues = [...this.pending.values()];
     this.pending.clear();
+    for (const queue of queues) {
+      for (const waiter of queue) {
+        waiter.reject(new DeviceError("connection closed", "disconnected"));
+      }
+    }
     this.unsolicitedHandlers.clear();
     await this.connection.close();
   }

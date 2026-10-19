@@ -7,8 +7,11 @@ import {
   encodePacket,
   takePacket,
 } from "../src/lib/packet";
+
 import { PacketIo } from "../src/lib/packetIo";
 import { StubConnection } from "./support/stub";
+
+const settle = (ms = 0): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 describe("packet framing", () => {
   it("matches the example request state packet from openscq30-lib", () => {
@@ -96,6 +99,23 @@ describe("PacketIo", () => {
     const pending = io.sendWithResponse(createPacket([0x06, 0x81], [1]));
     connection.deliverGarbage(new Uint8Array(100));
     connection.sendInbound(ackPacket(createPacket([0x06, 0x81])));
+    const response = await pending;
+    expect(response.command).toEqual([0x06, 0x81]);
+    await io.close();
+  });
+
+  it("keeps a valid packet that is glued to a garbage prefix", async () => {
+    // ackUnscripted is off so the only answer is the one glued behind the garbage.
+    const connection = new StubConnection({ ackUnscripted: false });
+    const io = new PacketIo(connection);
+    const pending = io.sendWithResponse(createPacket([0x06, 0x81], [1]));
+    await settle();
+    // Two stray bytes followed by a complete packet in the very same chunk.
+    const ack = encodePacket("inbound", ackPacket(createPacket([0x06, 0x81])));
+    const glued = new Uint8Array(2 + ack.length);
+    glued.set([0x42, 0x43], 0);
+    glued.set(ack, 2);
+    connection.deliverGarbage(glued);
     const response = await pending;
     expect(response.command).toEqual([0x06, 0x81]);
     await io.close();

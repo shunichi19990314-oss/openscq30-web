@@ -64,10 +64,14 @@ export function ToggleControl({ descriptor, label, disabled, onChange }: Control
   );
 }
 
-export function SelectControl({ descriptor, label, disabled, onChange }: ControlProps) {
+export function SelectControl({ descriptor, label, disabled, t, onChange }: ControlProps) {
   const setting = descriptor.setting;
   if (setting.kind !== "select" && setting.kind !== "optionalSelect") return null;
   const optional = setting.kind === "optionalSelect";
+  const currentValue = setting.select.value;
+  const hasListedOption =
+    currentValue !== null &&
+    setting.select.options.some((option) => option.value === currentValue);
   return (
     <SettingRow label={label}>
       <select
@@ -77,8 +81,14 @@ export function SelectControl({ descriptor, label, disabled, onChange }: Control
           onChange({ type: "string", value: event.target.value === "" ? null : event.target.value })
         }
       >
+        {/* For an optional select, "none" is a real choice (a disabled button). Otherwise the
+            placeholder only represents a value that is not in the list, so it is not selectable. */}
         {optional ? <option value="">—</option> : null}
-        {!optional && setting.select.value === null ? <option value="">—</option> : null}
+        {!optional && !hasListedOption ? (
+          <option value="" disabled>
+            {setting.select.value ? t(setting.select.value) : t("custom")}
+          </option>
+        ) : null}
         {setting.select.options.map((option) => (
           <option key={option.value} value={option.value}>
             {option.label}
@@ -92,15 +102,18 @@ export function SelectControl({ descriptor, label, disabled, onChange }: Control
 export function RangeControl({ descriptor, label, disabled, onChange }: ControlProps) {
   if (descriptor.setting.kind !== "range") return null;
   const { min, max, step, value } = descriptor.setting;
+  // Devices can report values outside the documented range (the adaptive sensitivity level has
+  // been seen as 255). Clamp the slider but keep showing the real value.
+  const clamped = Math.min(max, Math.max(min, value));
   return (
-    <SettingRow label={label}>
+    <SettingRow label={label} hint={clamped === value ? undefined : `${min}–${max}`} >
       <div className="range-control">
         <input
           type="range"
           min={min}
           max={max}
           step={step}
-          value={value}
+          value={clamped}
           disabled={disabled}
           onChange={(event) => onChange({ type: "number", value: Number(event.target.value) })}
         />
@@ -225,7 +238,7 @@ export function ModifiableSelectControl({
   );
 }
 
-export function MultiSelectControl({ descriptor, label, disabled, onChange }: ControlProps) {
+export function MultiSelectControl({ descriptor, label, disabled, t, onChange }: ControlProps) {
   const setting = descriptor.setting;
   if (setting.kind !== "multiSelect" && setting.kind !== "multiSelectWithRemove") return null;
   const removable = setting.kind === "multiSelectWithRemove";
@@ -239,6 +252,7 @@ export function MultiSelectControl({ descriptor, label, disabled, onChange }: Co
   return (
     <SettingRow label={label}>
       <div className="multi-select">
+        {removable ? <small className="hint">{t("dual-connections-limit")}</small> : null}
         {setting.select.options.length === 0 ? <em>—</em> : null}
         {setting.select.options.map((option) => (
           <label key={option.value} className="checkbox">
@@ -288,13 +302,16 @@ export function ImportStringControl({ descriptor, label, disabled, t, onChange }
             type="button"
             disabled={disabled || text.trim().length === 0}
             onClick={() => {
-              try {
-                onChange({ type: "string", value: text });
-                setError(null);
-                setText("");
-              } catch (caught) {
-                setError(caught instanceof Error ? caught.message : String(caught));
+              // Validate before handing the value over: `onChange` is applied asynchronously, so a
+              // failure there would not reach this catch block and the input would be lost.
+              const problem = validateProfileJson(text);
+              if (problem) {
+                setError(problem);
+                return;
               }
+              onChange({ type: "string", value: text });
+              setError(null);
+              setText("");
             }}
           >
             {t("import-profiles")}
@@ -304,6 +321,28 @@ export function ImportStringControl({ descriptor, label, disabled, t, onChange }
       </div>
     </SettingRow>
   );
+}
+
+/** Local, synchronous version of the import validation, so the UI can show the error inline. */
+function validateProfileJson(text: string): string | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error);
+  }
+  if (!Array.isArray(parsed)) return "expected a JSON array of profiles";
+  for (const entry of parsed) {
+    if (typeof entry !== "object" || entry === null) return "each profile must be an object";
+    const record = entry as Record<string, unknown>;
+    if (typeof record.name !== "string" || !Array.isArray(record.volumeAdjustments)) {
+      return 'each profile needs a "name" and "volumeAdjustments"';
+    }
+    if (record.volumeAdjustments.some((value) => typeof value !== "number")) {
+      return "volumeAdjustments must be numbers";
+    }
+  }
+  return null;
 }
 
 export function ExportOutputControl({ descriptor, label, t }: ControlProps) {
@@ -374,6 +413,9 @@ export function SettingControl(props: ControlProps): React.ReactElement | null {
 
 /* -------------------------------------------------------------- equalizer --- */
 
+/** How long the equalizer keeps showing unconfirmed values before falling back to the device. */
+const PENDING_CONFIRM_TIMEOUT_MS = 4000;
+
 interface EqualizerSetting {
   kind: "equalizer";
   bandHz: number[];
@@ -382,6 +424,10 @@ interface EqualizerSetting {
   fractionDigits: number;
   value: number[];
   readOnly: boolean;
+}
+
+function arraysEqual(a: number[], b: number[]): boolean {
+  return a.length === b.length && a.every((value, index) => value === b[index]);
 }
 
 function formatDb(raw: number, fractionDigits: number): string {
@@ -395,12 +441,28 @@ function formatHz(hz: number): string {
 
 export function EqualizerControl({ descriptor, label, disabled, t, onChange }: ControlProps) {
   const setting = descriptor.setting as EqualizerSetting;
+  // `pending` is what was sent to the device but not confirmed yet. Keeping it avoids the sliders
+  // snapping back to the old values for the round trip duration.
   const [draft, setDraft] = useState<number[] | null>(null);
-  const values = useMemo(() => draft ?? setting.value, [draft, setting.value]);
+  const [pending, setPending] = useState<number[] | null>(null);
+  const values = useMemo(() => draft ?? pending ?? setting.value, [draft, pending, setting.value]);
+
+  useEffect(() => {
+    if (!pending) return;
+    if (arraysEqual(pending, setting.value)) {
+      setPending(null);
+      return;
+    }
+    // The write may have failed or the device may not echo the value back; do not keep showing an
+    // unconfirmed value forever.
+    const timer = setTimeout(() => setPending(null), PENDING_CONFIRM_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [pending, setting.value]);
 
   const scale = Math.pow(10, setting.fractionDigits);
   const commit = (next: number[]): void => {
     setDraft(null);
+    setPending(next);
     onChange({ type: "numbers", value: next });
   };
 

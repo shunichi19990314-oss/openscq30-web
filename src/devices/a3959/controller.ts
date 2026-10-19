@@ -33,6 +33,7 @@ import {
   parseDualConnectionsDevice,
   parseDualFirmwareVersion,
   parseSerialNumber,
+  type AmbientSoundModeCycle,
   type DualConnectionsDevice,
   type DualFirmwareVersion,
 } from "../../lib/structures/common";
@@ -45,12 +46,14 @@ import {
 import {
   DISABLED_ACTION_ID,
   actionStatusByte,
+  actionStatusEqual,
   buttonPosition,
   buttonSettingsFor,
   buttonStatusCollectionEqual,
   buttonStatusEqual,
   currentActionIdIgnoringEnabled,
   enabledStatusByte,
+  enabledStatusEqual,
   withButtonAction,
   type Button,
 } from "../../lib/structures/buttons";
@@ -72,6 +75,7 @@ import {
   A3959_NOISE_CANCELING_MODES,
   AMBIENT_SOUND_MODES,
   MULTI_SCENE_OPTIONS,
+  a3959SoundModesEqual,
   parseA3959SoundModes,
   planSoundModesMigration,
   type A3959NoiseCancelingMode,
@@ -913,6 +917,7 @@ export class A3959Controller {
   }
 
   private async modifySoundModes(target: A3959State): Promise<void> {
+    if (a3959SoundModesEqual(this.state.soundModes, target.soundModes)) return;
     const path = planSoundModesMigration(this.state.soundModes, target.soundModes);
     for (const step of path) {
       await this.send(packets.setSoundModesPacket(step));
@@ -944,7 +949,7 @@ export class A3959Controller {
       const button = A3959_BUTTON_CONFIGURATION.order[index];
       const settings = buttonSettingsFor(A3959_BUTTON_CONFIGURATION, button);
 
-      if (JSON.stringify(currentStatus.action) !== JSON.stringify(targetStatus.action)) {
+      if (!actionStatusEqual(currentStatus.action, targetStatus.action)) {
         await this.send(
           packets.setButtonActionPacket({
             side: button.startsWith("left") ? "left" : "right",
@@ -955,7 +960,7 @@ export class A3959Controller {
         );
       }
       if (
-        JSON.stringify(currentStatus.enabled) !== JSON.stringify(targetStatus.enabled) &&
+        !enabledStatusEqual(currentStatus.enabled, targetStatus.enabled) &&
         targetStatus.enabled !== null
       ) {
         await this.send(
@@ -978,10 +983,7 @@ export class A3959Controller {
 
   private async modifyAmbientSoundModeCycle(target: A3959State): Promise<void> {
     if (target.buttonResetPending) return;
-    if (
-      JSON.stringify(this.state.ambientSoundModeCycle) ===
-      JSON.stringify(target.ambientSoundModeCycle)
-    ) {
+    if (ambientSoundModeCycleEqual(this.state.ambientSoundModeCycle, target.ambientSoundModeCycle)) {
       return;
     }
     await this.send(packets.setAmbientSoundModeCyclePacket(target.ambientSoundModeCycle));
@@ -1099,9 +1101,11 @@ export class A3959Controller {
   async refresh(): Promise<void> {
     const response = await this.send(packets.requestStatePacket());
     const update = parseA3959StateUpdate(response.body);
+    // Matches openscq30-lib: when dual connections is off, the device list is empty rather than
+    // whatever was reported before.
     const devices = update.dualConnectionsEnabled
       ? await takeDualConnectionDevices(this.options.packetIo, this.options.onLog)
-      : this.state.dualConnections.devices;
+      : [];
     this.setState(a3959StateFromUpdate(update, devices));
   }
 }
@@ -1171,6 +1175,17 @@ async function takeDualConnectionDevices(
     20,
   );
   return devices;
+}
+
+function ambientSoundModeCycleEqual(
+  a: AmbientSoundModeCycle,
+  b: AmbientSoundModeCycle,
+): boolean {
+  return (
+    a.noiseCancelingMode === b.noiseCancelingMode &&
+    a.transparencyMode === b.transparencyMode &&
+    a.normalMode === b.normalMode
+  );
 }
 
 function arraysEqual(a: number[], b: number[]): boolean {

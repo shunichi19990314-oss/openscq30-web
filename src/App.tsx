@@ -38,7 +38,11 @@ export function App() {
 
   useEffect(() => {
     saveAppSettings(settings);
-    localStorage.setItem("openscq30-web:language", language);
+    try {
+      localStorage.setItem("openscq30-web:language", language);
+    } catch {
+      // storage may be unavailable (private mode); the choice still applies for this session
+    }
   }, [settings, language]);
 
   const setLanguage = useCallback(

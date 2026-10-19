@@ -205,11 +205,27 @@ export function withButtonAction(
   };
 }
 
+export function enabledStatusEqual(a: EnabledStatus, b: EnabledStatus): boolean {
+  if (a === null || b === null) return a === b;
+  if (a.kind !== b.kind) return false;
+  if (a.kind === "single" && b.kind === "single") return a.value === b.value;
+  if (a.kind === "tws" && b.kind === "tws") {
+    return a.connected === b.connected && a.disconnected === b.disconnected;
+  }
+  return false;
+}
+
+export function actionStatusEqual(a: ActionStatus, b: ActionStatus): boolean {
+  if (a.kind !== b.kind) return false;
+  if (a.kind === "single" && b.kind === "single") return a.value === b.value;
+  if (a.kind === "tws" && b.kind === "tws") {
+    return a.connected === b.connected && a.disconnected === b.disconnected;
+  }
+  return false;
+}
+
 export function buttonStatusEqual(a: ButtonStatus, b: ButtonStatus): boolean {
-  return (
-    JSON.stringify(a.enabled) === JSON.stringify(b.enabled) &&
-    JSON.stringify(a.action) === JSON.stringify(b.action)
-  );
+  return enabledStatusEqual(a.enabled, b.enabled) && actionStatusEqual(a.action, b.action);
 }
 
 export function buttonStatusCollectionEqual(

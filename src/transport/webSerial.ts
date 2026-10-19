@@ -46,6 +46,9 @@ export interface RequestPortOptions {
   signal?: AbortSignal;
 }
 
+/** Cap on buffered chunks received before a read handler is registered. */
+const EARLY_CHUNK_LIMIT = 64;
+
 export class WebSerialUnsupportedError extends Error {
   constructor() {
     super("Web Serial API is not available in this browser");
@@ -107,6 +110,9 @@ export async function openPort(port: SerialPort, baudRate = 9600): Promise<WebSe
   await port.open({ baudRate });
 
   let readHandler: ((data: Uint8Array) => void) | null = null;
+  // The read loop starts before the caller can register its handler; hold on to anything that
+  // arrives in the meantime instead of dropping it (devices can push updates right after opening).
+  const earlyChunks: Uint8Array[] = [];
   let disconnectHandler: ((reason?: unknown) => void) | null = null;
   let closed = false;
   let writer: WritableStreamDefaultWriter<Uint8Array> | null = null;
@@ -139,9 +145,18 @@ export async function openPort(port: SerialPort, baudRate = 9600): Promise<WebSe
         if (done) break;
         if (value && value.length > 0) {
           // Copy: the underlying buffer may be reused by the browser.
-          readHandler?.(new Uint8Array(value));
+          const chunk = new Uint8Array(value);
+          if (readHandler) {
+            readHandler(chunk);
+          } else if (earlyChunks.length < EARLY_CHUNK_LIMIT) {
+            earlyChunks.push(chunk);
+          }
         }
       }
+      // The stream ended cleanly, which means the RFCOMM channel went away (the headphones were
+      // powered off, moved out of range, or another app took over). `navigator.serial`'s disconnect
+      // event does not always fire in that case, so report it here too.
+      handleClosed("the device closed the connection");
     } catch (error) {
       if (!closed) handleClosed(error);
     } finally {
@@ -170,6 +185,8 @@ export async function openPort(port: SerialPort, baudRate = 9600): Promise<WebSe
     },
     setReadHandler(handler: (data: Uint8Array) => void): void {
       readHandler = handler;
+      const pending = earlyChunks.splice(0, earlyChunks.length);
+      for (const chunk of pending) handler(chunk);
     },
     setDisconnectHandler(handler: (reason?: unknown) => void): void {
       disconnectHandler = handler;

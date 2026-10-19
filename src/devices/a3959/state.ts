@@ -4,7 +4,7 @@
  * Ported from openscq30-lib `lib/src/devices/soundcore/a3959/`.
  */
 
-import { ByteReader, concatBytes } from "../../lib/bytes";
+import { ByteReader, ParseError, concatBytes, toHex } from "../../lib/bytes";
 import { createPacket, type Packet } from "../../lib/packet";
 import {
   ambientSoundModeCycleByte,
@@ -101,7 +101,8 @@ export function defaultA3959StateUpdatePacket(): A3959StateUpdatePacket {
     serialNumber: defaultSerialNumber,
     equalizerConfiguration: {
       presetId: 0,
-      channels: [{ values: new Array(A3959_EQUALIZER_CONFIG.bands).fill(0) }],
+      // Same defaults as the Soundcore Signature preset: the tenth band sits at -12.0 dB.
+      channels: [{ values: [0, 0, 0, 0, 0, 0, 0, 0, 0, -120] }],
     },
     buttonConfiguration: defaultButtonStatusCollection(A3959_BUTTON_CONFIGURATION),
     ambientSoundModeCycle: {
@@ -126,6 +127,21 @@ export function defaultA3959StateUpdatePacket(): A3959StateUpdatePacket {
  */
 export function parseA3959StateUpdate(body: Uint8Array): A3959StateUpdatePacket {
   const reader = new ByteReader(body);
+  try {
+    return parseA3959StateUpdateInner(reader);
+  } catch (error) {
+    // A firmware that lays the packet out differently is the most likely cause of a failure here,
+    // and the hex dump is exactly what an upstream issue needs.
+    if (error instanceof ParseError) {
+      throw new ParseError(
+        `${error.message} [${error.context.join(" > ")}] (body ${body.length} bytes: ${toHex(body)})`,
+      );
+    }
+    throw error;
+  }
+}
+
+function parseA3959StateUpdateInner(reader: ByteReader): A3959StateUpdatePacket {
   const packet = reader.withContext("a3959 state update packet", () => {
     const twsStatus = parseTwsStatus(reader);
     const dualBattery = parseDualBattery(reader);

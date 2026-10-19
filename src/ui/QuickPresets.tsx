@@ -83,11 +83,7 @@ export function QuickPresets({
         </div>
       ) : null}
 
-      {presets.length === 0 ? (
-        <p className="hint">
-          {t("create-quick-preset")}: {t("quick-presets")}
-        </p>
-      ) : (
+      {presets.length === 0 ? <p className="hint">{t("quick-presets-empty")}</p> : (
         <ul className="preset-list">
           {presets.map((preset) => (
             <li key={preset.id}>

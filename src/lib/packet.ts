@@ -62,6 +62,12 @@ const DIRECTION_LENGTH = 5;
 const COMMAND_LENGTH = 2;
 const PACKET_SIZE_LENGTH = 2;
 
+/**
+ * Upper bound for a plausible packet. Real Soundcore packets are at most a few hundred bytes
+ * (the state update is 91); anything larger means the stream is not aligned on a packet boundary.
+ */
+export const MAX_PACKET_LENGTH = 8192;
+
 /** `Packet::bytes` */
 export function encodePacket(
   direction: Direction,
@@ -123,12 +129,20 @@ export function takePacket(
   reader.take(DIRECTION_LENGTH);
   const command: Command = [reader.u8(), reader.u8()];
   const declaredLength = reader.u16le();
-  const bodyLength = Math.max(
-    0,
-    declaredLength - (headerLength + (hasChecksum ? 1 : 0)),
-  );
 
-  if (buffer.length < headerLength + bodyLength + (hasChecksum ? 1 : 0)) {
+  // A length outside the plausible range means we are looking at garbage. Reporting `incomplete`
+  // here would make the receive buffer grow forever waiting for bytes that never arrive, so fail
+  // instead and let the caller resynchronize.
+  const minimumLength = headerLength + (hasChecksum ? 1 : 0);
+  if (declaredLength < minimumLength || declaredLength > MAX_PACKET_LENGTH) {
+    return {
+      kind: "error",
+      error: new ParseError(`implausible packet length: ${declaredLength}`),
+    };
+  }
+  const bodyLength = declaredLength - minimumLength;
+
+  if (buffer.length < declaredLength) {
     return { kind: "incomplete" };
   }
 

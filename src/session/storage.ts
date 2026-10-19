@@ -131,7 +131,6 @@ export interface AppSettings {
   language: "ja" | "en";
   /** Extra Bluetooth service class IDs to allow in the port chooser. */
   customServiceUuids: string[];
-  showLog: boolean;
 }
 
 const APP_SETTINGS_KEY = `${PREFIX}:settings`;
@@ -139,7 +138,6 @@ const APP_SETTINGS_KEY = `${PREFIX}:settings`;
 export const defaultAppSettings: AppSettings = {
   language: "ja",
   customServiceUuids: [],
-  showLog: false,
 };
 
 export function loadAppSettings(): AppSettings {
