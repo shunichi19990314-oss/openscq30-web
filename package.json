@@ -11,7 +11,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "smoke": "npm run build && node scripts/smoke.mjs",
-    "screenshots": "npm run build && node scripts/screenshots.mjs"
+    "screenshots": "npm run build && npm run build:preview && node scripts/screenshots.mjs",
+    "build:preview": "vite build --config vite.preview.config.ts"
   },
   "dependencies": {
     "react": "^18.3.1",

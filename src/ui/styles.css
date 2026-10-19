@@ -968,13 +968,6 @@ select:disabled {
   align-items: center;
 }
 
-.demo-controls {
-  border-top: 1px dashed var(--border);
-  padding-top: var(--sp-3);
-  display: grid;
-  gap: var(--sp-2);
-}
-
 /* --------------------------------------------------------- category cards --- */
 
 .category {

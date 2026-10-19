@@ -12,7 +12,7 @@ npm run build      # -> dist/  （型チェック込み）
 
 > **Web Serial の要件**: secure context（HTTPS または `http://localhost`）+
 > Chrome / Edge 117 以降（デスクトップ）または Chrome 138 以降（Android）。
-> Safari / Firefox / iOS 上の全ブラウザでは実機接続ができません（デモモードは動作）。
+> Safari / Firefox / iOS 上の全ブラウザでは実機接続ができません。
 
 ---
 
@@ -178,7 +178,7 @@ docker run -p 8080:80 openscq30-web
 
 1. ページを開き、DevTools Console に `navigator.serial` があること
    （`undefined` ならブラウザ未対応か非セキュアコンテキスト）
-2. 「デモ機器で試す」で設定画面が出ること（実機不要の動作確認）
+2. 「イヤホンに接続する」ボタンと、ブラウザ要件のチェックリストが出ること
 3. OS でペアリング → 「イヤホンに接続する」→ 選択ダイアログに Soundcore が出ること
 4. 接続後、バッテリー残量・シリアル番号・ファームウェアが表示されること
 5. EQ プリセットを変えて「通信ログ」に `02 83` の送信が出ること

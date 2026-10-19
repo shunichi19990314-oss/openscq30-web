@@ -8,7 +8,7 @@ import { PacketIo } from "../src/lib/packetIo";
 import { createPacket, encodePacket, takePacket } from "../src/lib/packet";
 import { StubConnection } from "./support/stub";
 import { A3959Controller, type CustomProfileStore } from "../src/devices/a3959/controller";
-import { DemoA3959Device } from "../src/transport/demo";
+import { FakeA3959Device } from "./support/fakeDevice";
 import { migrationValue } from "../src/lib/migration";
 import {
   planSoundModesMigration,
@@ -213,7 +213,7 @@ function requirements(): Array<{ index: number; values: ReturnType<typeof migrat
 
 describe("controller parity", () => {
   it("does not send equalizer packets while TWS is disconnected", async () => {
-    const device = new DemoA3959Device({ latencyMs: 5 });
+    const device = new FakeA3959Device({ latencyMs: 5 });
     device.mutate((state) => {
       state.twsStatus = { hostDevice: "left", isConnected: false };
     }, false);
@@ -235,7 +235,7 @@ describe("controller parity", () => {
   });
 
   it("clears the dual connection device list when dual connections is disabled", async () => {
-    const device = new DemoA3959Device({ latencyMs: 5 });
+    const device = new FakeA3959Device({ latencyMs: 5 });
     const io = new PacketIo(device);
     const controller = await A3959Controller.connect({
       packetIo: io,

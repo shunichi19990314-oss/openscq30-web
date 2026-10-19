@@ -61,14 +61,6 @@ export function App() {
     }
   }, [session, settings.customServiceUuids]);
 
-  const connectDemo = useCallback(async () => {
-    try {
-      await session.connectDemo();
-    } catch {
-      // ignored, see above
-    }
-  }, [session]);
-
   const connectPort = useCallback(
     async (port: SerialPort) => {
       try {
@@ -131,7 +123,6 @@ export function App() {
               setSettings((current) => ({ ...current, customServiceUuids: uuids }))
             }
             onConnectSerial={() => void connectSerial()}
-            onConnectDemo={() => void connectDemo()}
             onConnectPort={(port) => void connectPort(port)}
           />
         )}

@@ -188,7 +188,7 @@ function parseA3959StateUpdateInner(reader: ByteReader): A3959StateUpdatePacket 
   return packet;
 }
 
-/** Serializes a state update packet body. Used by the in-browser demo device. */
+/** Serializes a state update packet body (used by the tests and the preview harness). */
 export function a3959StateUpdateBytes(packet: A3959StateUpdatePacket): Uint8Array {
   return concatBytes([
     twsStatusBytes(packet.twsStatus),

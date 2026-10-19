@@ -8,13 +8,7 @@ import {
   portLabel,
 } from "../transport/webSerial";
 import { vendorUuidCandidates } from "../session/session";
-import {
-  AlertIcon,
-  BluetoothIcon,
-  ChevronIcon,
-  HeadphonesArt,
-  PlugIcon,
-} from "./icons";
+import { AlertIcon, BluetoothIcon, ChevronIcon, HeadphonesArt } from "./icons";
 
 export interface ConnectScreenProps {
   connecting: boolean;
@@ -22,7 +16,6 @@ export interface ConnectScreenProps {
   customUuids: string[];
   onSaveCustomUuids: (uuids: string[]) => void;
   onConnectSerial: () => void;
-  onConnectDemo: () => void;
   onConnectPort: (port: SerialPort) => void;
 }
 
@@ -32,7 +25,6 @@ export function ConnectScreen({
   customUuids,
   onSaveCustomUuids,
   onConnectSerial,
-  onConnectDemo,
   onConnectPort,
 }: ConnectScreenProps) {
   const { t } = useApp();
@@ -113,16 +105,6 @@ export function ConnectScreen({
             {connecting ? <span className="spinner" /> : <BluetoothIcon width={17} height={17} />}
             {connecting ? t("connecting") : t("connect-real-device")}
           </button>
-          <button
-            type="button"
-            className="btn btn-secondary btn-block"
-            disabled={connecting}
-            onClick={onConnectDemo}
-          >
-            <PlugIcon width={16} height={16} />
-            {t("connect-demo-device")}
-          </button>
-          <p className="hint">{t("demo-note")}</p>
         </div>
 
         {supported && ports.length > 0 ? (

@@ -1,10 +1,12 @@
 /**
- * In-browser demo device.
+ * Test double for a Soundcore P30i (A3959).
  *
- * openscq30-lib ships a `DemoConnectionRegistry` that answers request state with a canned packet
- * and ACKs everything else. This goes a bit further and actually simulates a Soundcore P30i, so the
- * whole UI can be used (and tested) without hardware: every write is applied to the simulated state
- * and pushed back as a state update, just like a real device does.
+ * This lives under tests/ on purpose: the production app talks to real hardware only. The fake
+ * applies every write to its simulated state and pushes a state update back, exactly like the
+ * device does, which lets the integration tests verify the whole stack without hardware.
+ *
+ * It is inspired by openscq30-lib's `DemoConnectionRegistry`, but goes further by implementing the
+ * real behaviour for every command the controller sends.
  */
 
 import {
@@ -14,32 +16,32 @@ import {
   encodePacket,
   takePacket,
   type Packet,
-} from "../lib/packet";
-import { ByteReader, concatBytes } from "../lib/bytes";
-import type { TransportConnection } from "./transport";
+} from "../../src/lib/packet";
+import { ByteReader, concatBytes } from "../../src/lib/bytes";
+import type { TransportConnection } from "../../src/transport/transport";
 import {
   a3959StateUpdatePacketToInbound,
   defaultA3959StateUpdatePacket,
   parseA3959StateUpdate,
   type A3959StateUpdatePacket,
-} from "../devices/a3959/state";
-import { A3959_BUTTON_CONFIGURATION } from "../devices/a3959/buttons";
+} from "../../src/devices/a3959/state";
+import { A3959_BUTTON_CONFIGURATION } from "../../src/devices/a3959/buttons";
 import {
   A3959_EQUALIZER_CONFIG,
   parseEqualizerConfiguration,
-} from "../lib/structures/equalizer";
+} from "../../src/lib/structures/equalizer";
 import {
   defaultButtonStatusCollection,
   type ButtonStatusCollection,
-} from "../lib/structures/buttons";
+} from "../../src/lib/structures/buttons";
 import {
   dualConnectionsDeviceBytes,
   type DualConnectionsDevice,
-} from "../lib/structures/common";
-import { parseA3959SoundModes } from "../devices/a3959/soundModes";
-import * as commands from "../devices/a3959/packets";
+} from "../../src/lib/structures/common";
+import { parseA3959SoundModes } from "../../src/devices/a3959/soundModes";
+import * as commands from "../../src/devices/a3959/packets";
 
-export interface DemoDeviceOptions {
+export interface FakeDeviceOptions {
   /** Initial state. Defaults to a realistic P30i state. */
   state?: Partial<A3959StateUpdatePacket>;
   /** Simulated round trip time in milliseconds. */
@@ -138,8 +140,8 @@ function buttonPressKindOf(button: string): string {
   return "slideDown";
 }
 
-export class DemoA3959Device implements TransportConnection {
-  readonly name = "Soundcore P30i (demo)";
+export class FakeA3959Device implements TransportConnection {
+  readonly name = "Soundcore P30i (fake)";
   private state: A3959StateUpdatePacket;
   private dualConnectionDevices: DualConnectionsDevice[];
   private readHandler: ((data: Uint8Array) => void) | null = null;
@@ -149,7 +151,7 @@ export class DemoA3959Device implements TransportConnection {
   /** Every packet written by the app, for the debug console. */
   readonly received: Packet[] = [];
 
-  constructor(private readonly options: DemoDeviceOptions = {}) {
+  constructor(private readonly options: FakeDeviceOptions = {}) {
     this.state = { ...defaultDemoState(), ...(options.state ?? {}) };
     this.dualConnectionDevices = (options.dualConnectionDevices ?? DEFAULT_DEMO_DEVICES).map(
       (device) => ({ ...device }),
@@ -165,10 +167,10 @@ export class DemoA3959Device implements TransportConnection {
   }
 
   async write(data: Uint8Array): Promise<void> {
-    if (this.closed) throw new Error("demo device is closed");
+    if (this.closed) throw new Error("fake device is closed");
     const result = takePacket("outbound", data);
     if (result.kind !== "packet") {
-      this.options.onLog?.(`demo device received an unparsable packet (${result.kind})`);
+      this.options.onLog?.(`fake device received an unparsable packet (${result.kind})`);
       return;
     }
     this.received.push(result.packet);
@@ -182,7 +184,7 @@ export class DemoA3959Device implements TransportConnection {
   }
 
   /** Simulates the cable being cut / the earbuds being turned off. */
-  disconnect(reason = "demo device disconnected"): void {
+  disconnect(reason = "fake device disconnected"): void {
     void this.close();
     this.disconnectHandler?.(reason);
   }
@@ -264,11 +266,11 @@ export class DemoA3959Device implements TransportConnection {
         pushState = false;
         pushDualConnections = true;
       } else {
-        this.options.onLog?.(`demo device ignoring command ${key}`);
+        this.options.onLog?.(`fake device ignoring command ${key}`);
         pushState = false;
       }
     } catch (error) {
-      this.options.onLog?.(`demo device failed to handle command ${key}`, error);
+      this.options.onLog?.(`fake device failed to handle command ${key}`, error);
       pushState = false;
       pushDualConnections = false;
     }
@@ -358,7 +360,7 @@ function macAddressFromBody(body: Uint8Array): string {
   return Array.from(body.subarray(0, 6), (byte) => byte.toString(16).padStart(2, "0")).join(":");
 }
 
-/** Parses a state update the demo device produced; handy for tests. */
-export function parseDemoState(device: DemoA3959Device): A3959StateUpdatePacket {
+/** Parses a state update the fake device produced. */
+export function parseFakeState(device: FakeA3959Device): A3959StateUpdatePacket {
   return parseA3959StateUpdate(a3959StateUpdatePacketToInbound(device.getState()).body);
 }

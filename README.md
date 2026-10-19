@@ -23,7 +23,7 @@ OpenSCQ30 は BLE ではなく **Bluetooth Classic の RFCOMM（SPP / ベンダ�
 - **HTTPS**（secure context）。Render の `*.onrender.com` は HTTPS なので条件を満たします
 - 事前に **OS の Bluetooth 設定でペアリング済み**であること
 
-Safari / Firefox / iOS では Web Serial が実装されていないため**実機接続はできません**（デモモードは動きます）。
+Safari / Firefox / iOS では Web Serial が実装されていないため**実機接続はできません**。
 
 ## 機能
 
@@ -34,7 +34,6 @@ Safari / Firefox / iOS では Web Serial が実装されていないため**実�
 - **その他**: サラウンドサウンド、オートパワーオフ、操作音、電池残量低下の通知音、ゲームモード（ファームウェア 01.60 以上）
 - **デバイス情報**: バッテリー残量（左／右）・充電状態、TWS 状態、ホストデバイス、シリアル番号、ファームウェア
 - **設定プリセット**: 現在の設定をまとめて保存し、一括で適用（ブラウザ内保存）
-- **デモモード**: 実機なしで全機能を試せる P30i シミュレータ内蔵
 - **通信ログ**: 送受信パケットを 16 進で表示（実機トラブルシュート用）
 - **日本語 / English** UI
 
@@ -61,15 +60,20 @@ UI の要点:
 
 スクリーンショットの再生成: `npm run screenshots`（ヘッドレス Chromium が必要）
 
-## まず試す（実機不要）
+## まず試す
 
 ```bash
 npm install
 npm run dev        # http://localhost:5173
 ```
 
-画面の「**デモ機器で試す**」を押すと、ブラウザ内で模擬した P30i に接続して全設定を操作できます。
-デモ機器側も実際のパケットを解釈して状態を更新するので、EQ プリセット適用や ANC モード遷移の挙動を確認できます。
+`http://localhost` は secure context 扱いなので、**デプロイしなくても実機の P30i に接続できます**。
+OS でペアリングしてから「イヤホンに接続する」→ 一覧から Soundcore を選んでください。
+実機がない環境では接続画面までが表示され、ブラウザ要件のチェック結果がその場に出ます。
+
+> 開発者向け: 設定画面のデザイン確認用に、テストダブル（`tests/support/fakeDevice.ts`）を
+> 繋ぐ**開発専用プレビュー**を同梱しています（`npm run build:preview` → `dist-preview/`）。
+> これは CI・デプロイで使う `npm run build` には含まれず、公開ページから到達する方法もありません。
 
 ## 実機に接続する
 
@@ -127,6 +131,7 @@ npm run dev        # 開発サーバー
 npm test           # 51 件のユニット／統合テスト（vitest）
 npm run build      # 型チェック + 本番ビルド（dist/）
 npm run smoke      # ビルド後に jsdom で実際に操作する E2E スモークテスト
+                   # （プロダクションバンドルにシミュレータが混入していないことも検証します）
 npx tsc --noEmit   # 型チェックのみ
 ```
 
@@ -147,7 +152,7 @@ src/
     settings.ts     UI 向け設定モデル（Setting / Value）
     structures/     バイト単位の構造体（battery, equalizer, buttons, ...）
   devices/a3959/  機種固有実装（state update, プリセット, ボタン定義, controller）
-  transport/      webSerial.ts（実機） / demo.ts（シミュレータ）
+  transport/      webSerial.ts（実機のみ。シミュレータは tests/support/fakeDevice.ts にテスト専用で存在）
   session/        接続ライフサイクル、ログ、localStorage ストレージ
   i18n/           日本語 / 英語（ラベルは本家 fluent カタログ準拠）
   ui/             React コンポーネント

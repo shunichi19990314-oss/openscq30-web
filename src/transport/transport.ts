@@ -5,8 +5,8 @@
  * way to reach an RFCOMM service is the Web Serial API (Chrome/Edge 117+ on desktop, Chrome 138+ on
  * Android), which exposes paired Bluetooth Classic serial services as serial ports.
  *
- * Everything above this layer only sees a byte stream, so the same device code works against a real
- * device (`WebSerialTransport`) and against the in-browser simulator (`DemoTransport`).
+ * Everything above this layer only sees a byte stream, so the device code does not care whether the
+ * bytes come from a real device or from a test double.
  */
 
 export type ConnectionStatus = "connected" | "disconnected";

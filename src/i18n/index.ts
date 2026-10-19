@@ -157,7 +157,7 @@ const en: Dictionary = {
   "do-not-share-connection":
     "Do not connect at the same time as the desktop OpenSCQ30 or the official Soundcore app.",
   "supported-browsers":
-    "Supported: Chrome / Edge 117+ (Windows, macOS, Linux, ChromeOS) and Chrome 138+ (Android). Safari, Firefox and iOS have no Web Serial, so only the demo mode works there.",
+    "Supported: Chrome / Edge 117+ (Windows, macOS, Linux, ChromeOS) and Chrome 138+ (Android). Safari, Firefox and iOS have no Web Serial, so the app cannot reach the headphones there.",
   "default-uuids": "Allowed by default",
   "ambient-short-noiseCanceling": "ANC",
   "ambient-short-transparency": "Transparency",
@@ -169,12 +169,10 @@ const en: Dictionary = {
   "browser-check-paired": "Headphones paired with the OS",
   "connect-how-to": "How to connect",
   "granted-ports-title": "Previously allowed ports",
-  "demo-note": "No hardware needed: a simulated P30i runs in this tab.",
   // ui
   connect: "Connect",
   disconnect: "Disconnect",
   "connect-real-device": "Connect to headphones",
-  "connect-demo-device": "Try the demo device",
   "reconnect-granted": "Reconnect to a previously used port",
   "choose-device": "Choose a device",
   "no-granted-ports": "No ports have been granted yet.",
@@ -199,9 +197,6 @@ const en: Dictionary = {
   "import-profiles": "Import",
   "log-title": "Communication log",
   "clear-log": "Clear",
-  "demo-mode": "Demo mode",
-  "demo-mode-hint":
-    "A simulated P30i is running in this tab. No hardware is contacted and nothing is sent over Bluetooth.",
   "browser-unsupported":
     "This browser cannot talk to the headphones. Web Serial with Bluetooth RFCOMM support is required: Chrome or Edge 117+ on desktop, or Chrome 138+ on Android.",
   "insecure-context":
@@ -220,16 +215,11 @@ const en: Dictionary = {
   "device-model": "Device model",
   "connection-type": "Connection",
   "connection-serial": "Bluetooth RFCOMM (Web Serial)",
-  "connection-demo": "Simulated device",
   about: "About this app",
   "about-body":
     "An unofficial web port of OpenSCQ30 for the Soundcore P30i (A3959). It speaks the same RFCOMM protocol as the desktop app directly from the browser. Not affiliated with Anker or the OpenSCQ30 project.",
   "upstream-link": "OpenSCQ30 upstream",
   "state-updated": "State updated from the device",
-  "simulate": "Simulate",
-  "simulate-tws-disconnect": "Disconnect the other earbud",
-  "simulate-tws-connect": "Reconnect both earbuds",
-  "simulate-battery-drain": "Drop battery by 1",
   "db": "{db} dB",
   hz: "{hz} Hz",
 };
@@ -376,7 +366,7 @@ const ja: Dictionary = {
   "do-not-share-connection":
     "デスクトップ版 OpenSCQ30 や公式 Soundcore アプリとは同時に接続しない",
   "supported-browsers":
-    "対応: Chrome / Edge 117 以降（Windows・macOS・Linux・ChromeOS）、Chrome 138 以降（Android）。Safari・Firefox・iOS は Web Serial 未対応のためデモモードのみ動作します。",
+    "対応: Chrome / Edge 117 以降（Windows・macOS・Linux・ChromeOS）、Chrome 138 以降（Android）。Safari・Firefox・iOS は Web Serial 未対応のため、これらの環境からはイヤホンに接続できません。",
   "default-uuids": "既定で許可される UUID",
   "ambient-short-noiseCanceling": "ノイキャン",
   "ambient-short-transparency": "外音取り込み",
@@ -388,12 +378,10 @@ const ja: Dictionary = {
   "browser-check-paired": "OS でイヤホンをペアリング済み",
   "connect-how-to": "接続方法",
   "granted-ports-title": "以前許可したポート",
-  "demo-note": "実機は不要です。このタブ内で P30i を模擬します。",
   // ui
   connect: "接続",
   disconnect: "切断",
   "connect-real-device": "イヤホンに接続する",
-  "connect-demo-device": "デモ機器で試す",
   "reconnect-granted": "以前許可したポートに再接続",
   "choose-device": "デバイスを選択",
   "no-granted-ports": "まだ許可されたポートはありません。",
@@ -418,9 +406,6 @@ const ja: Dictionary = {
   "import-profiles": "インポート",
   "log-title": "通信ログ",
   "clear-log": "クリア",
-  "demo-mode": "デモモード",
-  "demo-mode-hint":
-    "このタブ内で P30i を模擬しています。実機には接続せず、Bluetooth 通信は行いません。",
   "browser-unsupported":
     "このブラウザからはイヤホンに接続できません。Bluetooth RFCOMM に対応した Web Serial が必要です（デスクトップの Chrome / Edge 117 以降、または Android の Chrome 138 以降）。",
   "insecure-context":
@@ -439,16 +424,11 @@ const ja: Dictionary = {
   "device-model": "機種",
   "connection-type": "接続方法",
   "connection-serial": "Bluetooth RFCOMM（Web Serial）",
-  "connection-demo": "模擬デバイス",
   about: "このアプリについて",
   "about-body":
     "OpenSCQ30 を Soundcore P30i (A3959) 向けにウェブへ移植した非公式アプリです。デスクトップ版と同じ RFCOMM プロトコルをブラウザから直接話します。Anker ならびに OpenSCQ30 プロジェクトとは関係ありません。",
   "upstream-link": "OpenSCQ30 本家リポジトリ",
   "state-updated": "機器から状態を受信しました",
-  simulate: "シミュレート",
-  "simulate-tws-disconnect": "片側のイヤホンを切断",
-  "simulate-tws-connect": "両方のイヤホンを再接続",
-  "simulate-battery-drain": "バッテリーを 1 減らす",
   db: "{db} dB",
   hz: "{hz} Hz",
 };

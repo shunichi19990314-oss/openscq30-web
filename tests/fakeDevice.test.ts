@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 
 import { PacketIo } from "../src/lib/packetIo";
 import { A3959Controller, type CustomProfileStore } from "../src/devices/a3959/controller";
-import { DemoA3959Device } from "../src/transport/demo";
+import { FakeA3959Device } from "./support/fakeDevice";
 import { primaryVolumeAdjustments } from "../src/lib/structures/equalizer";
 
 function memoryProfileStore(): CustomProfileStore {
@@ -35,7 +35,7 @@ function memoryProfileStore(): CustomProfileStore {
 }
 
 async function connectDemo(latencyMs = 5) {
-  const device = new DemoA3959Device({ latencyMs });
+  const device = new FakeA3959Device({ latencyMs });
   const packetIo = new PacketIo(device);
   const controller = await A3959Controller.connect({
     packetIo,

@@ -11,7 +11,6 @@ import {
   type CustomProfileStore,
 } from "../devices/a3959/controller";
 import type { A3959State } from "../devices/a3959/state";
-import { DemoA3959Device } from "../transport/demo";
 import type { TransportConnection } from "../transport/transport";
 import { openPort, requestPort, soundcoreVendorServiceUuid } from "../transport/webSerial";
 import type { Translator } from "../i18n";
@@ -31,7 +30,7 @@ export type SessionStatus = "idle" | "connecting" | "connected" | "error";
 export interface SessionSnapshot {
   status: SessionStatus;
   error: string | null;
-  connectionKind: "serial" | "demo" | null;
+  connectionKind: "serial" | null;
   connectionLabel: string | null;
   state: A3959State | null;
   settings: SettingDescriptor[];
@@ -111,7 +110,6 @@ export class Session {
   private controller: A3959Controller | null = null;
   private packetIo: PacketIo | null = null;
   private connection: TransportConnection | null = null;
-  private demoDevice: DemoA3959Device | null = null;
   private logCounter = 0;
   /** Number of in-flight setting changes, so overlapping requests cannot clear `busy` early. */
   private busyCount = 0;
@@ -158,35 +156,31 @@ export class Session {
     const port = await requestPort({
       allowedBluetoothServiceClassIds: options.allowedBluetoothServiceClassIds,
     });
-    const connection = await openPort(port);
-    await this.start(connection, "serial", connection.name);
+    await this.connectToPort(port);
   }
 
   /** Connects to an already granted port (no chooser). */
   async connectToPort(port: SerialPort): Promise<void> {
     const connection = await openPort(port);
     try {
-      await this.start(connection, "serial", connection.name);
+      await this.connectWith(connection, connection.name);
     } catch (error) {
       await connection.close().catch(() => undefined);
       throw error;
     }
   }
 
-  /** Connects to the simulated device. */
-  async connectDemo(): Promise<void> {
-    const demo = new DemoA3959Device({
-      latencyMs: 40,
-      onLog: (message, data) =>
-        this.log("debug", `[demo] ${message}`, data === undefined ? undefined : String(data)),
-    });
-    this.demoDevice = demo;
-    await this.start(demo, "demo", this.options.t("connection-demo"));
+  /**
+   * Connects over any transport. Tests inject a fake connection here; the app itself only uses the
+   * Web Serial entry points above.
+   */
+  async connectWith(connection: TransportConnection, label: string): Promise<void> {
+    await this.start(connection, "serial", label);
   }
 
   private async start(
     connection: TransportConnection,
-    kind: "serial" | "demo",
+    kind: "serial",
     label: string,
   ): Promise<void> {
     await this.disconnect();
@@ -248,7 +242,6 @@ export class Session {
       await packetIo.close();
       this.packetIo = null;
       this.connection = null;
-      this.demoDevice = null;
       this.update({
         status: "error",
         error: this.options.t("error-connect", { message }),
@@ -269,7 +262,6 @@ export class Session {
     await this.packetIo?.close();
     this.packetIo = null;
     this.connection = null;
-    this.demoDevice = null;
   }
 
   async disconnect(): Promise<void> {
@@ -353,32 +345,6 @@ export class Session {
     }
   }
 
-  /* --------------------------------------------------- demo device extras --- */
-
-  get demo(): DemoA3959Device | null {
-    return this.demoDevice;
-  }
-
-  simulateTwsDisconnect(): void {
-    this.demoDevice?.mutate((state) => {
-      state.twsStatus = { hostDevice: "left", isConnected: false };
-      state.dualBattery.right.level = 255;
-    });
-  }
-
-  simulateTwsConnect(): void {
-    this.demoDevice?.mutate((state) => {
-      state.twsStatus = { hostDevice: "right", isConnected: true };
-      state.dualBattery.right.level = 7;
-    });
-  }
-
-  simulateBatteryDrain(): void {
-    this.demoDevice?.mutate((state) => {
-      state.dualBattery.left.level = Math.max(0, state.dualBattery.left.level - 1);
-      state.dualBattery.right.level = Math.max(0, state.dualBattery.right.level - 1);
-    });
-  }
 }
 
 function describePacket(direction: "tx" | "rx", bytes: Uint8Array): string {

@@ -11,7 +11,7 @@ import {
   importCustomProfiles,
   type CustomProfileStore,
 } from "../src/devices/a3959/controller";
-import { DemoA3959Device } from "../src/transport/demo";
+import { FakeA3959Device } from "./support/fakeDevice";
 import { StubConnection } from "./support/stub";
 import { Session, settingToValue, PRESETTABLE_SETTING_IDS } from "../src/session/session";
 import { LocalStorageProfileStore, QuickPresetStore } from "../src/session/storage";
@@ -50,7 +50,7 @@ function memoryProfileStore(): CustomProfileStore {
 }
 
 async function connectDemo(latencyMs = 5) {
-  const device = new DemoA3959Device({ latencyMs });
+  const device = new FakeA3959Device({ latencyMs });
   const packetIo = new PacketIo(device);
   const profiles = memoryProfileStore();
   const controller = await A3959Controller.connect({
@@ -254,7 +254,7 @@ describe("concurrency and disconnection", () => {
   it("rejects an in-flight change when the connection closes instead of hanging", async () => {
     // A device that answers the initial state request and then goes quiet, so the write below is
     // still pending when the connection is closed.
-    const stateBody = a3959StateUpdateBytes(new DemoA3959Device().getState());
+    const stateBody = a3959StateUpdateBytes(new FakeA3959Device().getState());
     const connection = new StubConnection({
       ackUnscripted: false,
       responses: StubConnection.responseMap([
@@ -280,47 +280,46 @@ describe("concurrency and disconnection", () => {
 });
 
 describe("session lifecycle", () => {
-  it("keeps a handle on the demo device so it can be simulated", async () => {
+  it("connects through an injected transport and reflects its updates", async () => {
     const t = createTranslator("ja");
     const session = new Session({ profiles: memoryProfileStore(), t });
-    await session.connectDemo();
-    expect(session.getSnapshot().connectionKind).toBe("demo");
-    expect(session.demo).not.toBeNull();
+    const fake = new FakeA3959Device({ latencyMs: 5 });
+    await session.connectWith(fake, "fake");
+    expect(session.getSnapshot().status).toBe("connected");
+    expect(session.getSnapshot().connectionKind).toBe("serial");
+    expect(session.getSnapshot().state?.serialNumber).toBe("3959DED6692DB6F4");
 
-    session.simulateBatteryDrain();
+    fake.mutate((state) => {
+      state.dualBattery.left.level = 3;
+    });
     await settle();
-    expect(session.getSnapshot().state?.dualBattery.left.level).toBe(7);
+    expect(session.getSnapshot().state?.dualBattery.left.level).toBe(3);
 
-    session.simulateTwsDisconnect();
+    fake.mutate((state) => {
+      state.twsStatus = { hostDevice: "left", isConnected: false };
+      state.dualBattery.right.level = 255;
+    });
     await settle();
     const snapshot = session.getSnapshot();
     expect(snapshot.state?.twsStatus.isConnected).toBe(false);
+    // With TWS disconnected the equalizer settings disappear.
     expect(snapshot.settings.some((descriptor) => descriptor.id === "presetEqualizerProfile")).toBe(
       false,
     );
 
-    session.simulateTwsConnect();
-    await settle();
-    expect(session.getSnapshot().state?.twsStatus.isConnected).toBe(true);
-    expect(
-      session.getSnapshot().settings.some((descriptor) => descriptor.id === "presetEqualizerProfile"),
-    ).toBe(true);
-
     await session.disconnect();
     expect(session.getSnapshot().status).toBe("idle");
-    expect(session.demo).toBeNull();
+    expect(session.getSnapshot().state).toBeNull();
   });
 
-  it("recovers when connecting fails and does not leave a demo handle behind", async () => {
+  it("rejects a connection that never answers and reports the error", async () => {
     const t = createTranslator("ja");
     const session = new Session({ profiles: memoryProfileStore(), t });
-    // A connection that answers nothing: the initial state request times out.
     const connection = new StubConnection({ ackUnscripted: false });
-    const packetIo = new PacketIo(connection, "suffix", { baseTimeoutMs: 5 });
-    await expect(
-      A3959Controller.connect({ packetIo, profiles: memoryProfileStore(), t }),
-    ).rejects.toThrow();
-    expect(session.demo).toBeNull();
-    await packetIo.close();
+    await expect(session.connectWith(connection, "fake")).rejects.toThrow(/timed out/);
+    expect(session.getSnapshot().status).toBe("error");
+    expect(session.getSnapshot().state).toBeNull();
+    await session.disconnect();
+    expect(session.getSnapshot().status).toBe("idle");
   });
 });

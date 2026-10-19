@@ -11,6 +11,7 @@ import { DeviceScreen } from "../src/ui/DeviceScreen";
 import { Session } from "../src/session/session";
 import { LocalStorageProfileStore, QuickPresetStore } from "../src/session/storage";
 import { createTranslator } from "../src/i18n";
+import { FakeA3959Device } from "./support/fakeDevice";
 
 describe("connect screen", () => {
   it("renders the app shell", () => {
@@ -28,7 +29,7 @@ describe("device screen", () => {
     const profiles = new LocalStorageProfileStore();
     const presetStore = new QuickPresetStore();
     const session = new Session({ profiles, t });
-    await session.connectDemo();
+    await session.connectWith(new FakeA3959Device({ latencyMs: 5 }), "fake");
     const snapshot = session.getSnapshot();
     expect(snapshot.status).toBe("connected");
 
@@ -70,7 +71,7 @@ describe("device screen", () => {
   it("renders in English too", async () => {
     const t = createTranslator("en");
     const session = new Session({ profiles: new LocalStorageProfileStore(), t });
-    await session.connectDemo();
+    await session.connectWith(new FakeA3959Device({ latencyMs: 5 }), "fake");
     const html = renderToStaticMarkup(
       <AppContext.Provider value={{ session, t, language: "en", setLanguage: () => {} }}>
         <DeviceScreen
@@ -91,7 +92,7 @@ describe("redesigned widgets", () => {
   async function renderDevice(language: "ja" | "en" = "ja") {
     const t = createTranslator(language);
     const session = new Session({ profiles: new LocalStorageProfileStore(), t });
-    await session.connectDemo();
+    await session.connectWith(new FakeA3959Device({ latencyMs: 5 }), "fake");
     const html = renderToStaticMarkup(
       <AppContext.Provider value={{ session, t, language, setLanguage: () => {} }}>
         <DeviceScreen

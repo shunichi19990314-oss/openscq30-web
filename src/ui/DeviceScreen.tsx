@@ -129,9 +129,9 @@ export function DeviceScreen({
           <span className={`status-dot${state.twsStatus.isConnected ? "" : " status-dot-off"}`} />
           <h1>Soundcore P30i</h1>
           <span className="chip">A3959</span>
-          <span className={`chip${snapshot.connectionKind === "demo" ? " chip-accent" : ""}`}>
-            {snapshot.connectionKind === "demo" ? t("demo-mode") : <BluetoothIcon width={12} height={12} />}
-            {snapshot.connectionKind === "demo" ? "" : " RFCOMM"}
+          <span className="chip">
+            <BluetoothIcon width={12} height={12} />
+            {t("connection-serial")}
           </span>
         </div>
 
@@ -186,22 +186,6 @@ export function DeviceScreen({
           </div>
         </div>
 
-        {snapshot.connectionKind === "demo" ? (
-          <div className="demo-controls">
-            <span className="hint">{t("demo-mode-hint")}</span>
-            <div className="chip-row">
-              <button type="button" className="chip" onClick={() => session.simulateTwsDisconnect()}>
-                {t("simulate-tws-disconnect")}
-              </button>
-              <button type="button" className="chip" onClick={() => session.simulateTwsConnect()}>
-                {t("simulate-tws-connect")}
-              </button>
-              <button type="button" className="chip" onClick={() => session.simulateBatteryDrain()}>
-                {t("simulate-battery-drain")}
-              </button>
-            </div>
-          </div>
-        ) : null}
       </header>
 
       <QuickPresets
