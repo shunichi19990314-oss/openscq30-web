@@ -194,6 +194,20 @@ Blueprint の利点は「ヘッダーや rewrite まで含めた構成がコー�
 
 ---
 
+## PWA とキャッシュ
+
+`render.yaml` は次のキャッシュポリシーを送出します（Service Worker の更新が確実に届くため）。
+
+| パス | Cache-Control |
+| --- | --- |
+| `/sw.js`, `/index.html`, `/manifest.webmanifest` | `no-cache` |
+| `/assets/*` | `public, max-age=31536000, immutable` |
+| その他 | 既定 |
+
+デプロイ後は DevTools → Application で Service Worker が `activated & running` になっていること、
+ Manifest に PNG アイコン（192/512, any/maskable）が認識されていることを確認してください。
+ これで Chrome / Edge / Android から**ホーム画面にインストール**でき、2 回目以降はオフラインでも起動します。
+
 ## デプロイ後の動作確認
 
 1. 発行された URL を **Chrome または Edge**（Android なら Chrome）で開く

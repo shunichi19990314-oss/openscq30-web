@@ -226,7 +226,7 @@ export interface ToastApi {
  * Toasts for transient feedback. `error` (from the session snapshot) is shown automatically and
  * dismisses itself; `push` is available for one-off confirmations.
  */
-export function useToasts(error: string | null): ToastApi {
+export function useToasts(error: string | null, notice: string | null = null): ToastApi {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const [seen, setSeen] = useState<string | null>(null);
   const counter = useRef(0);
@@ -253,6 +253,17 @@ export function useToasts(error: string | null): ToastApi {
   useEffect(() => {
     if (error === null) setSeen(null);
   }, [error]);
+
+  const [seenNotice, setSeenNotice] = useState<string | null>(null);
+  useEffect(() => {
+    if (!notice || notice === seenNotice) return;
+    setSeenNotice(notice);
+    push(notice, "info");
+  }, [notice, seenNotice, push]);
+
+  useEffect(() => {
+    if (notice === null) setSeenNotice(null);
+  }, [notice]);
 
   return { toasts, dismiss, push };
 }

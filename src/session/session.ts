@@ -30,6 +30,8 @@ export type SessionStatus = "idle" | "connecting" | "connected" | "error";
 export interface SessionSnapshot {
   status: SessionStatus;
   error: string | null;
+  /** Non-error notices (e.g. an unexpected disconnect) shown as a toast. */
+  notice: string | null;
   connectionKind: "serial" | null;
   connectionLabel: string | null;
   state: A3959State | null;
@@ -102,6 +104,7 @@ export class Session {
   private snapshot: SessionSnapshot = {
     status: "idle",
     error: null,
+    notice: null,
     connectionKind: null,
     connectionLabel: null,
     state: null,
@@ -114,6 +117,7 @@ export class Session {
   private packetIo: PacketIo | null = null;
   private connection: TransportConnection | null = null;
   private logCounter = 0;
+  private intentionalDisconnect = false;
   /** Number of in-flight setting changes, so overlapping requests cannot clear `busy` early. */
   private busyCount = 0;
   private unsubscribeController: (() => void) | null = null;
@@ -198,6 +202,9 @@ export class Session {
       );
       // Await teardown before flipping the status, so a reconnect cannot race with it.
       void this.teardown().then(() => {
+        if (this.intentionalDisconnect) {
+          this.intentionalDisconnect = false;
+        }
         this.busyCount = 0;
         this.update({
           status: "idle",
@@ -206,6 +213,7 @@ export class Session {
           state: null,
           settings: [],
           busy: false,
+          notice: this.options.t("disconnected-notice"),
         });
       });
     });
@@ -270,9 +278,11 @@ export class Session {
 
   async disconnect(): Promise<void> {
     if (!this.controller && !this.packetIo && !this.connection) {
-      this.update({ status: "idle", connectionKind: null, connectionLabel: null });
+      this.update({ status: "idle", connectionKind: null, connectionLabel: null, notice: null });
       return;
     }
+    // An explicit disconnect must not raise the "unexpectedly disconnected" notice.
+    this.intentionalDisconnect = true;
     await this.teardown();
     this.update({
       status: "idle",
@@ -281,6 +291,7 @@ export class Session {
       state: null,
       settings: [],
       error: null,
+      notice: null,
     });
   }
 

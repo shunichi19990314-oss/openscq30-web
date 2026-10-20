@@ -8,6 +8,9 @@ import { DeviceScreen } from "./ui/DeviceScreen";
 import { LocalStorageProfileStore, QuickPresetStore, loadAppSettings, saveAppSettings, type AppSettings } from "./session/storage";
 import { Session } from "./session/session";
 
+declare const __APP_VERSION__: string;
+const APP_VERSION = typeof __APP_VERSION__ === "string" ? __APP_VERSION__ : "dev";
+
 export function App() {
   const [settings, setSettings] = useState<AppSettings>(() => {
     const stored = loadAppSettings();
@@ -32,9 +35,10 @@ export function App() {
     () => session.getSnapshot(),
   );
 
-  // Re-render setting labels when the language changes.
+  // Re-render setting labels when the language changes, and keep <html lang> in sync.
   useEffect(() => {
     session.refreshLabels();
+    document.documentElement.lang = language;
   }, [language, session]);
 
   useEffect(() => {
@@ -87,6 +91,9 @@ export function App() {
   return (
     <AppContext.Provider value={contextValue}>
       <div className="app">
+        <a className="skip-link" href="#main">
+          {t("skip-to-content")}
+        </a>
         {snapshot.busy ? <div className="top-progress" role="progressbar" aria-label={t("applying-setting")} /> : null}
         <div className="top-bar">
           <span className="brand">
@@ -133,7 +140,9 @@ export function App() {
         )}
 
         <footer className="footer">
-          <span>GPL-3.0-or-later · OpenSCQ30 Web</span>
+          <span>
+            v{APP_VERSION} · GPL-3.0-or-later · OpenSCQ30 Web
+          </span>
           <a href="https://github.com/Oppzippy/OpenSCQ30" target="_blank" rel="noreferrer">
             upstream
           </a>

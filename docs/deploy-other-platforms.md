@@ -174,6 +174,21 @@ docker run -p 8080:80 openscq30-web
 | 認証 | 不要。ユーザーデータはブラウザ内（localStorage）にしか保存されません |
 | CORS / バックエンド | 不要。外部への通信は一切行いません |
 
+## Service Worker を正しく更新させるために
+
+本アプリは `sw.js` を同梱しています。どのホスティング先でも、**`sw.js` と `index.html` は
+キャッシュさせない**設定にしてください（さもないとデプロイ後も古い SW が残り続けます）。
+
+```nginx
+location = /sw.js        { add_header Cache-Control "no-cache"; }
+location = /index.html   { add_header Cache-Control "no-cache"; }
+location /assets/        { add_header Cache-Control "public, max-age=31536000, immutable"; }
+```
+
+Netlify / Cloudflare Pages / Vercel の場合は同等のルールを各ダッシュボード（または
+`netlify.toml` / `_headers` / `vercel.json`）で追加してください。ハッシュ付きアセットは
+不変なので長期キャッシュして問題ありません。
+
 ## 動作確認 checklist（どのホスティング先でも共通）
 
 1. ページを開き、DevTools Console に `navigator.serial` があること

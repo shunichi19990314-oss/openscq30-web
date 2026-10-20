@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { LogEntry, LogLevel } from "../session/session";
 import { useApp } from "./context";
@@ -23,6 +23,11 @@ export function LogDrawer({
 }) {
   const { t } = useApp();
   const [filter, setFilter] = useState<LogLevel | "all">("all");
+  const closeRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    closeRef.current?.focus();
+  }, []);
 
   const visible = useMemo(
     () =>
@@ -68,7 +73,7 @@ export function LogDrawer({
         <button type="button" className="btn btn-ghost" onClick={onClear}>
           {t("clear-log")}
         </button>
-        <button type="button" className="btn btn-icon" aria-label={t("close")} onClick={onClose}>
+        <button ref={closeRef} type="button" className="btn btn-icon" aria-label={t("close")} onClick={onClose}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden focusable="false">
             <path d="M6 6 18 18M18 6 6 18" />
           </svg>

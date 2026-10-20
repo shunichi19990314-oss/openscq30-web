@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 
 import { CATEGORY_ORDER, type CategoryId, type SettingDescriptor, type SettingValue } from "../lib/settings";
 import { SETTING_LABEL_KEYS, categoryLabelKey } from "../i18n";
@@ -77,7 +77,8 @@ export function DeviceScreen({
 }) {
   const { t } = useApp();
   const state = snapshot.state;
-  const toasts = useToasts(snapshot.error);
+  const toasts = useToasts(snapshot.error, snapshot.notice);
+  const logToggleRef = useRef<HTMLButtonElement | null>(null);
   const [logOpen, setLogOpen] = useState(false);
   const [open, setOpen] = useState<Record<string, boolean>>({ ...DEFAULT_OPEN });
 
@@ -123,7 +124,7 @@ export function DeviceScreen({
   const connectedDevices = state.dualConnections.devices.filter((device) => device.isConnected).length;
 
   return (
-    <div className="screen device-screen">
+    <main id="main" className="screen device-screen" aria-busy={snapshot.busy}>
       <header className="card device-header">
         <div className="device-title">
           <span className={`status-dot${state.twsStatus.isConnected ? "" : " status-dot-off"}`} />
@@ -171,6 +172,7 @@ export function DeviceScreen({
               {t("refresh-state")}
             </button>
             <button
+              ref={logToggleRef}
               type="button"
               className="btn btn-ghost"
               aria-pressed={logOpen}
@@ -261,10 +263,17 @@ export function DeviceScreen({
       </div>
 
       {logOpen ? (
-        <LogDrawer logs={snapshot.logs} onClear={() => session.clearLog()} onClose={() => setLogOpen(false)} />
+        <LogDrawer
+          logs={snapshot.logs}
+          onClear={() => session.clearLog()}
+          onClose={() => {
+            setLogOpen(false);
+            logToggleRef.current?.focus();
+          }}
+        />
       ) : null}
       <ToastStack toasts={toasts.toasts} onDismiss={toasts.dismiss} />
-    </div>
+    </main>
   );
 }
 

@@ -21,6 +21,18 @@ describe("connect screen", () => {
     // The browser cannot talk to the headphones in Node, so a warning is expected.
     expect(html).toContain("Web Serial");
   });
+
+  it("offers help for devices missing from the chooser", () => {
+    const html = renderToStaticMarkup(<App />);
+    expect(html).toContain("一覧に出ない場合");
+    expect(html).toContain('href="#main"');
+  });
+
+  it("does not offer any demo or simulator entry point", () => {
+    const html = renderToStaticMarkup(<App />);
+    expect(html).not.toContain("デモ機器で試す");
+    expect(html).not.toContain("demo");
+  });
 });
 
 describe("device screen", () => {

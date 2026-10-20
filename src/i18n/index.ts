@@ -131,6 +131,7 @@ const en: Dictionary = {
   "treble-reducer": "Treble Reducer",
 
   // ui (redesign)
+  "skip-to-content": "Skip to content",
   apply: "Apply",
   confirm: "Confirm",
   close: "Close",
@@ -216,6 +217,8 @@ const en: Dictionary = {
   "error-connect": "Could not connect: {message}",
   "error-setting": "Could not apply the change: {message}",
   retry: "Retry",
+  "disconnected-notice": "The device disconnected.",
+  "not-listed-help": "Device not listed? Check the requirements and UUID settings",
   "device-model": "Device model",
   "connection-type": "Connection",
   "connection-serial": "Bluetooth RFCOMM (Web Serial)",
@@ -344,6 +347,7 @@ const ja: Dictionary = {
   "treble-reducer": "トレブルリデューサー",
 
   // ui (redesign)
+  "skip-to-content": "メインコンテンツへ",
   apply: "適用",
   confirm: "実行する",
   close: "閉じる",
@@ -429,6 +433,8 @@ const ja: Dictionary = {
   "error-connect": "接続できませんでした：{message}",
   "error-setting": "設定を適用できませんでした：{message}",
   retry: "再試行",
+  "disconnected-notice": "機器との接続が切れました。",
+  "not-listed-help": "一覧に出ない場合（要件と UUID 設定の確認）",
   "device-model": "機種",
   "connection-type": "接続方法",
   "connection-serial": "Bluetooth RFCOMM（Web Serial）",

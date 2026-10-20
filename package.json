@@ -1,18 +1,20 @@
 {
   "name": "openscq30-web",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "description": "Web port of OpenSCQ30 (Soundcore P30i / A3959) using the Web Serial API over Bluetooth RFCOMM",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "tsc --noEmit && vite build && node scripts/finalize-sw.mjs",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
     "smoke": "npm run build && node scripts/smoke.mjs",
     "screenshots": "npm run build && npm run build:preview && node scripts/screenshots.mjs",
-    "build:preview": "vite build --config vite.preview.config.ts"
+    "build:preview": "vite build --config vite.preview.config.ts",
+    "icons": "node scripts/icons.mjs",
+    "pwa-check": "npm run build && node scripts/pwa-check.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",

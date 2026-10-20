@@ -323,3 +323,27 @@ describe("session lifecycle", () => {
     expect(session.getSnapshot().status).toBe("idle");
   });
 });
+
+describe("disconnect handling", () => {
+  it("raises a notice when the device disconnects unexpectedly", async () => {
+    const t = createTranslator("ja");
+    const session = new Session({ profiles: memoryProfileStore(), t });
+    const fake = new FakeA3959Device({ latencyMs: 5 });
+    await session.connectWith(fake, "fake");
+    expect(session.getSnapshot().notice).toBeNull();
+
+    fake.disconnect();
+    await settle();
+    expect(session.getSnapshot().status).toBe("idle");
+    expect(session.getSnapshot().notice).toBe(t("disconnected-notice"));
+  });
+
+  it("stays quiet when the user disconnects on purpose", async () => {
+    const t = createTranslator("ja");
+    const session = new Session({ profiles: memoryProfileStore(), t });
+    await session.connectWith(new FakeA3959Device({ latencyMs: 5 }), "fake");
+    await session.disconnect();
+    expect(session.getSnapshot().notice).toBeNull();
+    expect(session.getSnapshot().status).toBe("idle");
+  });
+});

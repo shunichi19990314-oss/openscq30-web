@@ -152,6 +152,26 @@ kbd {
   border-radius: 6px;
 }
 
+.skip-link {
+  position: absolute;
+  left: 50%;
+  top: -48px;
+  transform: translate(-50%, 0);
+  z-index: 100;
+  background: var(--accent);
+  color: #fff;
+  padding: 8px 16px;
+  border-radius: 0 0 10px 10px;
+  font-size: var(--fs-sm);
+  text-decoration: none;
+  transition: top var(--dur-2) var(--ease);
+}
+
+.skip-link:focus-visible {
+  top: 0;
+  outline: none;
+}
+
 .visually-hidden {
   position: absolute;
   width: 1px;

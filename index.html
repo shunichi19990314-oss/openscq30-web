@@ -2,18 +2,36 @@
 <html lang="ja">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="color-scheme" content="dark light" />
+    <meta name="theme-color" content="#0e1116" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#f2f4f8" media="(prefers-color-scheme: light)" />
     <meta
       name="description"
-      content="OpenSCQ30 Web - ブラウザから Soundcore P30i (A3959) の設定を変更する非公式ウェブアプリ"
+      content="OpenSCQ30 Web — ブラウザから Soundcore P30i (A3959) を設定する非公式ウェブアプリ。Web Serial 経由で Bluetooth RFCOMM を直接扱います。"
     />
+    <meta name="robots" content="index,follow" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="OpenSCQ30 Web" />
+    <meta property="og:title" content="OpenSCQ30 Web — Soundcore P30i" />
+    <meta
+      property="og:description"
+      content="ブラウザから Soundcore P30i (A3959) を設定する非公式ウェブアプリ。インストール不要、データはブラウザの外に出ません。"
+    />
+    <meta property="og:locale" content="ja_JP" />
+    <meta property="og:image" content="/icons/icon-512-any.png" />
+    <meta name="twitter:card" content="summary" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/icons/icon-192-any.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
-    <title>OpenSCQ30 Web</title>
   </head>
   <body>
     <div id="root"></div>
+    <noscript>
+      <p style="padding: 24px; font-family: system-ui, sans-serif">
+        このアプリは JavaScript を有効にする必要があります。 / This app requires JavaScript.
+      </p>
+    </noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

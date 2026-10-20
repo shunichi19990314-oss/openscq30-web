@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { useApp } from "./context";
 import {
@@ -37,6 +37,8 @@ export function ConnectScreen({
   const secure = isSecureContext();
   const [ports, setPorts] = useState<SerialPort[]>([]);
   const [uuidDraft, setUuidDraft] = useState(customUuids.join("\n"));
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const advancedRef = useRef<HTMLDetailsElement | null>(null);
 
   useEffect(() => {
     if (!supported) return;
@@ -60,7 +62,7 @@ export function ConnectScreen({
   ];
 
   return (
-    <div className="screen connect-screen">
+    <main id="main" className="screen connect-screen">
       <section className="card">
         <div className="hero">
           <HeadphonesArt className="hero-art" />
@@ -112,6 +114,21 @@ export function ConnectScreen({
           </button>
         </div>
 
+        <div className="row-actions">
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={() => {
+              setAdvancedOpen(true);
+              requestAnimationFrame(() => {
+                advancedRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+              });
+            }}
+          >
+            {t("not-listed-help")}
+          </button>
+        </div>
+
         {supported && ports.length > 0 ? (
           <div className="disclosure-body">
             <h2 className="visually-hidden">{t("granted-ports-title")}</h2>
@@ -147,7 +164,11 @@ export function ConnectScreen({
           </div>
         </details>
 
-        <details className="disclosure">
+        <details
+          className="disclosure"
+          ref={advancedRef}
+          open={advancedOpen || undefined}
+        >
           <summary>
             <ChevronIcon className="chevron" width={15} height={15} />
             {t("advanced")}
@@ -207,6 +228,6 @@ export function ConnectScreen({
           </a>
         </p>
       </section>
-    </div>
+    </main>
   );
 }

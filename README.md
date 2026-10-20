@@ -36,6 +36,8 @@ Safari / Firefox / iOS では Web Serial が実装されていないため**実�
 - **設定プリセット**: 現在の設定をまとめて保存し、一括で適用（ブラウザ内保存）
 - **通信ログ**: 送受信パケットを 16 進で表示（実機トラブルシュート用）
 - **日本語 / English** UI
+- **PWA**: ホーム画面にインストール可能、初回アクセス後はオフラインでも起動（Service Worker）
+- **選択ダイアログは対応機器のみ**: USB シリアルや他機種の SPP ポートは候補に出しません
 
 ## 見た目
 
@@ -129,6 +131,35 @@ BASE_PATH=/openscq30-web/ npm run build  # GitHub Pages のようなサブパス
 > **注意**: Web Serial はトップレベルの HTTPS ページでのみ使えます。iframe に埋め込む場合は
 > 埋め込み側で `allow="serial"` が必要です（`render.yaml` の `Permissions-Policy` は self のみ許可）。
 
+## PWA / オフライン
+
+- `manifest.webmanifest` + 192/512 PNG（any / maskable）を同梱。Chrome / Edge / Android で
+  **ホーム画面にインストール**できます
+- `public/sw.js` はナビゲーションをネットワーク優先（オフライン時はキャッシュへフォールバック）、
+  ハッシュ付きアセットをキャッシュ優先で扱います。デプロイごとに `scripts/finalize-sw.mjs` が
+  キャッシュ名を更新し、古いキャッシュは activate 時に削除されます
+- Service Worker は**本番ビルドでのみ**登録されます（開発サーバーは非干渉）
+- アイコンの再生成: `npm run icons`（`public/favicon.svg` から PNG を生成）
+
+## 公開前チェックリスト
+
+公開（= 不特定の人に URL を渡す）前に、この順で確認してください。
+
+1. `npm ci && npm test && npm run build && npm run smoke` が全て green
+2. Render（または任意の HTTPS ホスト）にデプロイされ、`https://…` で開ける
+3. **Chrome / Edge** で開き、接続画面に「イヤホンに接続する」と要件チェック（緑 2 つ）が出る
+4. 実機を OS でペアリングし、「イヤホンに接続する」→ 候補に Soundcore が出る → 接続して
+   バッテリー・シリアル・FW が表示される
+5. EQ を 1 バンド動かして「通信ログ」に `02 83` の送信と ACK が出る
+6. 端末を電源 OFF して、トースト「機器との接続が切れました。」が出ること
+7. `npm run pwa-check` が green（SW 有効化・オフライン起動・オンライン復帰）
+8. DevTools → Application → Manifest / Service Worker にエラーが無いこと（インストール可能）
+9. `docs/deploy-render.md` のヘッダー（CSP / Cache-Control）が効いていること
+   `curl -sI https://…/sw.js | grep -i cache-control` → `no-cache`
+
+実機が手元に無い環境では 4〜6 の代わりに `npm run build:preview` のプレビューハーネスで
+画面遷移を確認できます（公開ビルドには含まれません）。
+
 ## 開発
 
 ```bash
@@ -137,6 +168,8 @@ npm test           # 51 件のユニット／統合テスト（vitest）
 npm run build      # 型チェック + 本番ビルド（dist/）
 npm run smoke      # ビルド後に jsdom で実際に操作する E2E スモークテスト
                    # （プロダクションバンドルにシミュレータが混入していないことも検証します）
+npm run pwa-check  # 実ブラウザで SW 有効化・オフライン起動・復帰を検証
+npm run icons      # favicon.svg から PWA 用 PNG を再生成
 npx tsc --noEmit   # 型チェックのみ
 ```
 
