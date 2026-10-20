@@ -5,7 +5,15 @@
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { openPort, portLabel, soundcoreVendorServiceUuid } from "../src/transport/webSerial";
+import {
+  A3959_VENDOR_SERVICE_UUID,
+  SPP_SERVICE_UUID,
+  buildPortRequestOptions,
+  isSupportedPort,
+  openPort,
+  portLabel,
+  soundcoreVendorServiceUuid,
+} from "../src/transport/webSerial";
 import { PacketIo } from "../src/lib/packetIo";
 import { createPacket, encodePacket } from "../src/lib/packet";
 
@@ -160,6 +168,56 @@ describe("openPort", () => {
   it("derives the vendor uuid for a model number", () => {
     expect(soundcoreVendorServiceUuid("3959")).toBe(
       "0cf12d31-fac3-4553-bd80-d6832e7b3959",
+    );
+  });
+});
+
+describe("port chooser filtering", () => {
+  it("restricts the chooser to the supported vendor service by default", () => {
+    const options = buildPortRequestOptions();
+    expect(options.allowedBluetoothServiceClassIds).toEqual([A3959_VENDOR_SERVICE_UUID]);
+    expect(options.filters).toEqual([{ bluetoothServiceClassId: A3959_VENDOR_SERVICE_UUID }]);
+  });
+
+  it("adds custom uuids and, opt-in, the standard SPP service", () => {
+    const custom = "0cf12d31-fac3-4553-bd80-d6832e7b9999";
+    const withCustom = buildPortRequestOptions({ customUuids: [custom] });
+    expect(withCustom.allowedBluetoothServiceClassIds).toEqual([
+      A3959_VENDOR_SERVICE_UUID,
+      custom,
+    ]);
+
+    const withSpp = buildPortRequestOptions({ customUuids: [custom], includeSpp: true });
+    expect(withSpp.allowedBluetoothServiceClassIds).toEqual([
+      A3959_VENDOR_SERVICE_UUID,
+      custom,
+      SPP_SERVICE_UUID,
+    ]);
+    // filters and the allow list must stay in sync, otherwise Chrome hides the custom services
+    expect(withSpp.filters.map((filter) => filter.bluetoothServiceClassId)).toEqual(
+      withSpp.allowedBluetoothServiceClassIds,
+    );
+  });
+
+  it("deduplicates repeated uuids", () => {
+    const options = buildPortRequestOptions({
+      customUuids: [A3959_VENDOR_SERVICE_UUID, SPP_SERVICE_UUID],
+      includeSpp: true,
+    });
+    expect(options.allowedBluetoothServiceClassIds).toEqual([
+      A3959_VENDOR_SERVICE_UUID,
+      SPP_SERVICE_UUID,
+    ]);
+  });
+
+  it("accepts Bluetooth ports and rejects USB serial adapters", () => {
+    expect(
+      isSupportedPort({ bluetoothServiceClassId: A3959_VENDOR_SERVICE_UUID } as SerialPortInfo),
+    ).toBe(true);
+    // A mapped Bluetooth port that does not report its service class id is still a candidate.
+    expect(isSupportedPort({} as SerialPortInfo)).toBe(true);
+    expect(isSupportedPort({ usbVendorId: 0x2341, usbProductId: 0x0043 } as SerialPortInfo)).toBe(
+      false,
     );
   });
 });

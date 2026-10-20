@@ -39,7 +39,10 @@ export interface SessionSnapshot {
 }
 
 export interface ConnectSerialOptions {
-  allowedBluetoothServiceClassIds?: string[];
+  /** Extra non standard Bluetooth service class IDs to allow in the chooser. */
+  customUuids?: string[];
+  /** Also offer devices that only expose the standard SPP service. */
+  includeSpp?: boolean;
 }
 
 /** Settings that can be captured into a quick preset. */
@@ -154,7 +157,8 @@ export class Session {
   /** Opens the browser's port chooser and connects. Must be called from a user gesture. */
   async connectSerial(options: ConnectSerialOptions = {}): Promise<void> {
     const port = await requestPort({
-      allowedBluetoothServiceClassIds: options.allowedBluetoothServiceClassIds,
+      customUuids: options.customUuids,
+      includeSpp: options.includeSpp,
     });
     await this.connectToPort(port);
   }

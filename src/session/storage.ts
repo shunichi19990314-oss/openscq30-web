@@ -131,6 +131,8 @@ export interface AppSettings {
   language: "ja" | "en";
   /** Extra Bluetooth service class IDs to allow in the port chooser. */
   customServiceUuids: string[];
+  /** Also offer devices that only expose the standard SPP service in the chooser. */
+  includeSpp: boolean;
 }
 
 const APP_SETTINGS_KEY = `${PREFIX}:settings`;
@@ -138,6 +140,7 @@ const APP_SETTINGS_KEY = `${PREFIX}:settings`;
 export const defaultAppSettings: AppSettings = {
   language: "ja",
   customServiceUuids: [],
+  includeSpp: false,
 };
 
 export function loadAppSettings(): AppSettings {

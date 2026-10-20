@@ -24,15 +24,20 @@ RFCOMM_UUID (標準 SPP)   = 00001101-0000-1000-8000-00805f9b34fb
 ブラウザからは **Web Serial API** 経由で RFCOMM にアクセスします。
 
 ```js
+const uuids = ["0cf12d31-fac3-4553-bd80-d6832e7b3959"]; // 対応機種のサービスのみ
 const port = await navigator.serial.requestPort({
-  allowedBluetoothServiceClassIds: ["0cf12d31-fac3-4553-bd80-d6832e7b3959"],
+  // filters が選択ダイアログに「出すもの」を決める
+  filters: uuids.map((bluetoothServiceClassId) => ({ bluetoothServiceClassId })),
+  // 非標準 UUID は allowlist に入れないとそもそも候補にならない
+  allowedBluetoothServiceClassIds: uuids,
 });
 await port.open({ baudRate: 9600 }); // RFCOMM では baudRate は無視される
 ```
 
-標準 SPP のポートは allowlist なしで列挙されますが、**非標準のサービス UUID は明示的に許可**しないと
-選択ダイアログに出ません。ワイルドカードは使えないため、本アプリでは推定 UUID + ユーザー入力の
-UUID を allowlist として渡します。
+`filters` と `allowedBluetoothServiceClassIds` に**同じ UUID 集合**を渡すのがポイントです。
+前者だけだと非標準サービスが候補にならず、後者だけだと対応外の機器（USB シリアルや他機種の
+SPP ポート）まで一覧に出てしまいます。ワイルドカードは使えないため、本アプリでは
+「推定ベンダー UUID + ユーザーが追加した UUID（+ オプトインの標準 SPP）」をこの集合としています。
 
 ## 2. パケット形式
 

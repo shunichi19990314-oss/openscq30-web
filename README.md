@@ -82,15 +82,20 @@ OS でペアリングしてから「イヤホンに接続する」→ 一覧か�
 3. ブラウザの選択ダイアログで Soundcore の項目（Bluetooth RFCOMM）を選ぶ
 4. デスクトップ版 OpenSCQ30 や公式 Soundcore アプリとは**同時に接続しない**
 
+選択ダイアログには**対応機器のサービスだけ**が表示されます。既定で候補になるのは
+P30i の Soundcore ベンダー RFCOMM サービス（`0cf12d31-fac3-4553-bd80-d6832e7b3959`）のみで、
+USB シリアル変換アダプタやプリンタ、他機種の SPP ポートは一覧に出ません。
+
 一覧に Soundcore が出てこない場合:
 
 - Chrome / Edge の最新版であること（`chrome://version`）
 - HTTPS（または `localhost`）で開いていること
 - 他のアプリ（公式アプリ、デスクトップ版 OpenSCQ30）が RFCOMM を掴んでいないこと
-- 「詳細設定」→ **追加の Bluetooth サービス UUID** に、機器が出す UUID を追加する
-  （既定は `0cf12d31-fac3-4553-bd80-d6832e7b3959` と標準 SPP `00001101-…-00805f9b34fb`）。
+- 「詳細設定」→ **追加の Bluetooth サービス UUID** に、機器が出す UUID を追加する。
   Linux なら `bluetoothctl` + `sdptool browse <MAC>`、またはデスクトップ版 OpenSCQ30 を
   `--verbose` で起動してログから確認できます
+- その機器が標準 SPP しか公開していない場合は「詳細設定」→
+  **標準 SPP サービスも候補に含める** をオンにする（他種の SPP 機器も一覧に出るようになります）
 
 ## デプロイする
 

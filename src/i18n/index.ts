@@ -204,6 +204,10 @@ const en: Dictionary = {
   "pair-first":
     "Pair the headphones with your operating system's Bluetooth settings first, then press Connect and pick the Soundcore entry in the chooser.",
   "advanced": "Advanced",
+  "spp-compat": "Also offer devices that only expose the standard SPP service",
+  "spp-compat-hint":
+    "Off by default: the chooser then only lists the P30i's Soundcore vendor service (plus any UUIDs added above), so printers, Arduinos and other Soundcore models stay hidden.",
+  "chooser-lists": "Services shown in the chooser",
   "custom-service-uuids": "Extra Bluetooth service class IDs",
   "custom-service-uuids-hint":
     "One UUID per line. Needed if your device exposes a vendor RFCOMM service that is not listed by default.",
@@ -413,6 +417,10 @@ const ja: Dictionary = {
   "pair-first":
     "先に OS の Bluetooth 設定でイヤホンをペアリングしてから、「接続」を押して表示される一覧から Soundcore の項目を選んでください。",
   advanced: "詳細設定",
+  "spp-compat": "標準 SPP サービス（00001101-…）だけを公開する機器も候補に含める",
+  "spp-compat-hint":
+    "既定はオフです。オフのとき候補に出るのは P30i の Soundcore ベンダーサービス（と上の追加 UUID）だけで、プリンタや Arduino、他機種の SPP ポートは一覧に表示されません。",
+  "chooser-lists": "候補に表示されるサービス",
   "custom-service-uuids": "追加の Bluetooth サービス UUID",
   "custom-service-uuids-hint":
     "1 行に 1 つずつ入力します。既定の一覧に出てこないベンダー RFCOMM サービスを使う機器の場合に必要です。",

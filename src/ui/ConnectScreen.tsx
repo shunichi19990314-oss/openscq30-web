@@ -8,13 +8,16 @@ import {
   portLabel,
 } from "../transport/webSerial";
 import { vendorUuidCandidates } from "../session/session";
+import { COMPAT_SERVICE_UUIDS } from "../transport/webSerial";
 import { AlertIcon, BluetoothIcon, ChevronIcon, HeadphonesArt } from "./icons";
 
 export interface ConnectScreenProps {
   connecting: boolean;
   error: string | null;
   customUuids: string[];
+  includeSpp: boolean;
   onSaveCustomUuids: (uuids: string[]) => void;
+  onIncludeSppChange: (include: boolean) => void;
   onConnectSerial: () => void;
   onConnectPort: (port: SerialPort) => void;
 }
@@ -23,7 +26,9 @@ export function ConnectScreen({
   connecting,
   error,
   customUuids,
+  includeSpp,
   onSaveCustomUuids,
+  onIncludeSppChange,
   onConnectSerial,
   onConnectPort,
 }: ConnectScreenProps) {
@@ -148,6 +153,15 @@ export function ConnectScreen({
             {t("advanced")}
           </summary>
           <div className="disclosure-body">
+            <label className={`checkbox-card${includeSpp ? " checkbox-card-checked" : ""}`}>
+              <input
+                type="checkbox"
+                checked={includeSpp}
+                onChange={(event) => onIncludeSppChange(event.target.checked)}
+              />
+              <span className="name">{t("spp-compat")}</span>
+            </label>
+            <p className="hint">{t("spp-compat-hint")}</p>
             <label className="field">
               <span>{t("custom-service-uuids")}</span>
               <textarea
@@ -175,8 +189,10 @@ export function ConnectScreen({
               </button>
             </div>
             <p className="hint">
-              {t("default-uuids")}: {vendorUuidCandidates("3959").join(", ")} / SPP
-              （00001101-0000-1000-8000-00805f9b34fb）
+              {t("chooser-lists")}:{" "}
+              {[...vendorUuidCandidates("3959"), ...customUuids, ...(includeSpp ? COMPAT_SERVICE_UUIDS : [])].join(
+                ", ",
+              )}
             </p>
           </div>
         </details>

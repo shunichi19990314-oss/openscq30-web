@@ -54,12 +54,13 @@ export function App() {
   const connectSerial = useCallback(async () => {
     try {
       await session.connectSerial({
-        allowedBluetoothServiceClassIds: settings.customServiceUuids,
+        customUuids: settings.customServiceUuids,
+        includeSpp: settings.includeSpp,
       });
     } catch {
       // the session records the error in its snapshot
     }
-  }, [session, settings.customServiceUuids]);
+  }, [session, settings.customServiceUuids, settings.includeSpp]);
 
   const connectPort = useCallback(
     async (port: SerialPort) => {
@@ -119,8 +120,12 @@ export function App() {
             connecting={snapshot.status === "connecting"}
             error={snapshot.error}
             customUuids={settings.customServiceUuids}
+            includeSpp={settings.includeSpp}
             onSaveCustomUuids={(uuids) =>
               setSettings((current) => ({ ...current, customServiceUuids: uuids }))
+            }
+            onIncludeSppChange={(include) =>
+              setSettings((current) => ({ ...current, includeSpp: include }))
             }
             onConnectSerial={() => void connectSerial()}
             onConnectPort={(port) => void connectPort(port)}

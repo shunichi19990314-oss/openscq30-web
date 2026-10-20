@@ -30,12 +30,64 @@ export function soundcoreVendorServiceUuid(model: string): string {
   return `${SOUNDCORE_VENDOR_SERVICE_PREFIX}b${model}`;
 }
 
-/** Service class IDs the P30i (A3959) is known or suspected to expose. */
-export const A3959_SERVICE_UUIDS = [soundcoreVendorServiceUuid("3959"), SPP_SERVICE_UUID];
+/**
+ * The vendor RFCOMM service of the supported model (P30i / A3959). The chooser is restricted to
+ * this by default so unrelated serial devices never show up.
+ */
+export const A3959_VENDOR_SERVICE_UUID = soundcoreVendorServiceUuid("3959");
+
+/**
+ * Legacy fallback: some Soundcore devices only expose the standard Serial Port Profile. Including
+ * it would also list every other SPP device (printers, Arduinos, ...), so it is opt-in.
+ */
+export const COMPAT_SERVICE_UUIDS: string[] = [SPP_SERVICE_UUID];
 
 export interface WebSerialConnection extends TransportConnection {
   readonly port: SerialPort;
   readonly info: SerialPortInfo;
+}
+
+export interface PortRequestOptions {
+  /** Extra non standard Bluetooth service class IDs (the "advanced" field in the UI). */
+  customUuids?: string[];
+  /** Also offer devices that only expose the standard SPP service. */
+  includeSpp?: boolean;
+  signal?: AbortSignal;
+}
+
+/**
+ * Builds the `requestPort()` options. The same UUID set is used for `filters` (what the chooser
+ * shows) and for `allowedBluetoothServiceClassIds` (non standard IDs are hidden otherwise), which
+ * is what keeps unsupported devices out of the list.
+ */
+export function buildPortRequestOptions(options: PortRequestOptions = {}): {
+  filters: SerialPortFilter[];
+  allowedBluetoothServiceClassIds: string[];
+} {
+  const uuids = [A3959_VENDOR_SERVICE_UUID, ...(options.customUuids ?? [])];
+  if (options.includeSpp) uuids.push(...COMPAT_SERVICE_UUIDS);
+  const unique = [...new Set(uuids)];
+  return {
+    filters: unique.map((bluetoothServiceClassId) => ({ bluetoothServiceClassId })),
+    allowedBluetoothServiceClassIds: unique,
+  };
+}
+
+/** Bluetooth service class ID reported by the port, when the browser exposes it. */
+export function portServiceClassId(info: SerialPortInfo): string | null {
+  return (info as SerialPortInfo & { bluetoothServiceClassId?: string }).bluetoothServiceClassId ?? null;
+}
+
+/**
+ * True when a previously granted port is one this app is willing to open.
+ *
+ * Bluetooth RFCOMM ports are always candidates: the chooser already restricts what can be granted,
+ * and blocking a port whose UUID was removed from the settings later would strand the user.
+ * USB serial adapters, on the other hand, can never be Soundcore headphones.
+ */
+export function isSupportedPort(info: SerialPortInfo): boolean {
+  if (portServiceClassId(info) !== null) return true;
+  return info.usbVendorId === undefined && info.usbProductId === undefined;
 }
 
 export interface RequestPortOptions {
@@ -71,23 +123,26 @@ export function isSecureContext(): boolean {
   return typeof window !== "undefined" && window.isSecureContext;
 }
 
-/** Opens the browser's port chooser. Must be called from a user gesture. */
-export async function requestPort(options: RequestPortOptions = {}): Promise<SerialPort> {
-  const allowed = new Set<string>([
-    ...A3959_SERVICE_UUIDS,
-    ...(options.allowedBluetoothServiceClassIds ?? []),
-  ]);
-  const port = await serial().requestPort({
-    allowedBluetoothServiceClassIds: [...allowed],
-    ...(options.filters ? { filters: options.filters } : {}),
+/**
+ * Opens the browser's port chooser, restricted to the supported devices. Must be called from a
+ * user gesture.
+ */
+export async function requestPort(options: PortRequestOptions = {}): Promise<SerialPort> {
+  const { filters, allowedBluetoothServiceClassIds } = buildPortRequestOptions(options);
+  return serial().requestPort({
+    filters,
+    allowedBluetoothServiceClassIds,
     ...(options.signal ? { signal: options.signal } : {}),
   } as SerialPortRequestOptions);
-  return port;
 }
 
-/** Ports the user already granted permission to, which can be reopened without a chooser. */
+/**
+ * Ports the user already granted permission to, filtered to the ones this app supports, so the
+ * reconnect list never offers a USB adapter or an unrelated Bluetooth service.
+ */
 export async function getGrantedPorts(): Promise<SerialPort[]> {
-  return serial().getPorts();
+  const ports = await serial().getPorts();
+  return ports.filter((port) => isSupportedPort(port.getInfo()));
 }
 
 export function portLabel(port: SerialPort): string {
