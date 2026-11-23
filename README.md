@@ -7,6 +7,16 @@ Render の**静的サイト（無料枠）**にそのままデプロイできま
 設定値が外部に送信されることはありません（すべてブラウザ内完結）。
 
 ---
+## 🌐 English
+
+Unofficial **browser port of [OpenSCQ30](https://github.com/Oppzippy/OpenSCQ30)** - configure your **Soundcore P30i (A3959)** earbuds from the web. It speaks the same Bluetooth Classic **RFCOMM** protocol as the desktop app, but through the **Web Serial API**: no install, no backend, nothing leaves your browser.
+
+**Live demo: https://shunichi19990314-oss.github.io/openscq30-web/**
+(Chrome/Edge 117+ on desktop, Chrome 138+ on Android - pair the earbuds in OS Bluetooth settings first.)
+
+- 22 EQ presets + 8-band custom curve (DRC-aware packets), profiles import/export in desktop-compatible JSON
+- ANC / transparency / adaptive modes, multipoint toggle, tap-control remapping, battery & firmware info
+- JP/EN UI, installable PWA with offline support, hex communication log for troubleshooting
 
 ## なぜ Web Serial なのか（重要な前提）
 
